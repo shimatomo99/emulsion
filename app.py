@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（粒度分布・ピーク範囲指定解析対応）"
+    "🧪 乳化安定性 予測AIアシスタント（水油比率・ピーク範囲指定解析対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>ピーク範囲の指定と面積比、ΔD50変化量から相分離予兆を高精度に診断します。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>水油比率の自動計算、ピーク範囲指定、ΔD50変化量から相分離予兆を高精度に診断します。</p>",
     unsafe_allow_html=True,
 )
 
@@ -159,9 +159,9 @@ def extract_advanced_image_features(image_file):
 
 # --- 1. データ提出タブ ---
 with tab1:
-  st.header("実験データの提出（ピーク範囲指定・面積比対応）")
+  st.header("実験データの提出（水油比率・ピーク範囲対応）")
   st.markdown(
-      "初期・試験後の粒径変化（ΔD50）に加え、各ピークの検出範囲と面積比を登録します。"
+      "水層・油層の量から自動計算される油分率に加え、粒度分布やダイナミクスを登録します。"
   )
 
   submit_date = st.date_input(
@@ -177,6 +177,36 @@ with tab1:
       "使用した乳化剤を選択",
       ["アラビアガム", "ポリグリ", "キラヤ"],
       key="sub_emulsifier",
+  )
+
+  st.subheader("💧 処方組成（水層・油層の量）の入力")
+  col_w1, col_w2 = st.columns(2)
+  with col_w1:
+    water_amount = st.number_input(
+        "水層の量 (g または mL)",
+        min_value=0.0,
+        max_value=10000.0,
+        value=80.0,
+        step=1.0,
+        key="sub_water",
+    )
+  with col_w2:
+    oil_amount = st.number_input(
+        "油層の量 (g または mL)",
+        min_value=0.0,
+        max_value=10000.0,
+        value=20.0,
+        step=1.0,
+        key="sub_oil",
+    )
+
+  total_amount = water_amount + oil_amount
+  oil_ratio = (
+      (oil_amount / total_amount * 100.0) if total_amount > 0 else 0.0
+  )
+  st.info(
+      f"📊 **自動計算された油分率**: {oil_ratio:.1f}% （総量:"
+      f" {total_amount:.1f}g / 水層 {water_amount}g : 油層 {oil_amount}g）"
   )
 
   st.subheader("📊 虐待試験・粒度分布ピーク範囲の入力")
@@ -271,8 +301,8 @@ with tab1:
 
   delta_d50 = after_d50 - initial_d50
   st.info(
-      f"📈 **変化量プレビュー (ΔD50)**: {delta_d50:+.1f} nm （初期値からのシフト"
-      f"量） | **第2ピーク比率**: {peak2_ratio}%"
+      f"📈 **変化量プレビュー (ΔD50)**: {delta_d50:+.1f} nm | **第2ピーク比率**:"
+      f" {peak2_ratio}%"
   )
 
   turbidity = st.number_input(
@@ -341,6 +371,9 @@ with tab1:
               str(prescription_no) if prescription_no else "未設定"
           ),
           "emulsifier": emulsifier,
+          "water_amount": water_amount,
+          "oil_amount": oil_amount,
+          "oil_ratio": oil_ratio,
           "temperature": temperature,
           "test_days": test_days,
           "initial_d50": initial_d50,
@@ -379,24 +412,53 @@ with tab1:
       df["condition"] = df["condition"].astype(str)
       df.to_csv(DATA_FILE, index=False)
       st.success(
-          "データを正常に保存しました！ ΔD50: "
-          f"{delta_d50:+.1f}nm、第2ピーク比率({peak2_min}〜{peak2_max}nm):"
-          f" {peak2_ratio}% の登録が完了しました。"
+          "データを正常に保存しました！ 油分率: "
+          f"{oil_ratio:.1f}%（水 {water_amount}g / 油 {oil_amount}g）、ΔD50:"
+          f" {delta_d50:+.1f}nm の登録が完了しました。"
       )
     else:
       st.warning("写真をアップロードまたは撮影してください。")
 
 # --- 2. 予測・確認タブ ---
 with tab2:
-  st.header("AIによる安定性予測・ピーク範囲診断")
+  st.header("AIによる安定性予測・油分率ダイナミクス診断")
   st.markdown(
-      "指定したピーク範囲と面積比、粒径変化スピード（ΔD50）から、AIが分離予兆を高精度に診断します。"
+      "水層・油層量から算出される油分率やピーク範囲、変化量から、AIが分離リスクを高精度に診断します。"
   )
 
   pred_emulsifier = st.selectbox(
       "評価する乳化剤を選択",
       ["アラビアガム", "ポリグリ", "キラヤ"],
       key="pred_emulsifier",
+  )
+
+  st.subheader("💧 予測時の処方組成（水層・油層の量）の入力")
+  col_pw1, col_pw2 = st.columns(2)
+  with col_pw1:
+    pred_water = st.number_input(
+        "予測時の水層の量 (g または mL)",
+        min_value=0.0,
+        max_value=10000.0,
+        value=80.0,
+        step=1.0,
+        key="pred_water",
+    )
+  with col_pw2:
+    pred_oil = st.number_input(
+        "予測時の油層の量 (g または mL)",
+        min_value=0.0,
+        max_value=10000.0,
+        value=20.0,
+        step=1.0,
+        key="pred_oil",
+    )
+
+  pred_total = pred_water + pred_oil
+  pred_oil_ratio = (
+      (pred_oil / pred_total * 100.0) if pred_total > 0 else 0.0
+  )
+  st.info(
+      f"📊 **予測時 油分率**: {pred_oil_ratio:.1f}% （総量: {pred_total:.1f}g）"
   )
 
   st.subheader("🔍 予測時に評価する条件の入力")
@@ -471,8 +533,8 @@ with tab2:
 
   pred_delta_d50 = pred_after_d50 - pred_init_d50
   st.info(
-      f"📈 **予測時 ΔD50 変化量**: {pred_delta_d50:+.1f} nm | **第2ピーク比率"
-      f" ({pred_p2_min}〜{pred_p2_max}nm)**: {pred_p2_ratio}%"
+      f"📈 **予測時 ΔD50**: {pred_delta_d50:+.1f} nm | **油分率**: "
+      f"{pred_oil_ratio:.1f}% | **第2ピーク比率**: {pred_p2_ratio}%"
   )
 
   pred_turbidity = st.number_input(
@@ -507,6 +569,9 @@ with tab2:
           )
         else:
           feature_cols = [
+              "oil_ratio",
+              "water_amount",
+              "oil_amount",
               "delta_d50",
               "initial_d50",
               "after_d50",
@@ -547,6 +612,9 @@ with tab2:
                 extract_advanced_image_features(pred_file)
             )
             X_pred = np.array([[
+                pred_oil_ratio,
+                pred_water,
+                pred_oil,
                 pred_delta_d50,
                 pred_init_d50,
                 pred_after_d50,
@@ -590,17 +658,20 @@ with tab2:
                   f"（予測確信度: {confidence:.1f}%）"
               )
               st.warning(
-                  f"⚠️ **寿命予測の注意喚起**: 指定された第2ピーク範囲（"
-                  f"{pred_p2_min}〜{pred_p2_max}nm）の面積比率（{pred_p2_ratio}%）"
-                  f"や粒径変化スピードの傾向から推測して、過去データでは **約"
-                  f" {avg_unstable_days} 日前後** で破綻する恐れがあります。"
+                  f"⚠️ **寿命予測の注意喚起**: 油分率（{pred_oil_ratio:.1f}%）や"
+                  f"第2ピーク範囲の面積比、粒径変化スピードの傾向から推測して、過去データでは"
+                  f" **約 {avg_unstable_days} 日前後** で破綻する恐れがあります。"
               )
 
               st.info("🤖 **AIからの改善ヒント・アドバイス**")
               advice_list = []
+              if pred_oil_ratio > 40.0:
+                advice_list.append(
+                    "・**油分率が高めの処方です**：高内相エマルション（HIPRE）に近づいているため、界面を覆う乳化剤の絶対量が不足して合一が起きやすくなっている可能性があります。乳化剤の増量を推奨します。"
+                )
               if pred_p2_ratio > 3.0:
                 advice_list.append(
-                    f"・**第2ピーク（{pred_p2_min}〜{pred_p2_max}nm）の比率が {pred_p2_ratio}% と高めです**：粗大粒子や合一粒子が一定割合存在しており、相分離（クリーミング等）の引き金になります。ホモジナイザーの出力強化や乳化剤の再選定を推奨します。"
+                    f"・**第2ピーク（{pred_p2_min}〜{pred_p2_max}nm）の比率が {pred_p2_ratio}% と高めです**：粗大粒子の存在が相分離の引き金になります。"
                 )
               if pred_delta_d50 > 30:
                 advice_list.append(
@@ -614,10 +685,14 @@ with tab2:
               for advice in advice_list:
                 st.write(advice)
 
-            st.subheader("💡 判定の理由とピーク範囲指標")
+            st.subheader("💡 判定の理由と処方・ピーク指標")
             st.write(
                 f"- **乳化剤**: {pred_emulsifier} （学習データ数:"
                 f" {len(train_clean)}件）"
+            )
+            st.write(
+                f"- **処方組成**: 水層 `{pred_water}g` / 油層 `{pred_oil}g` （油分率:"
+                f" `{pred_oil_ratio:.1f}%`）"
             )
             st.write(
                 f"- **第1ピーク範囲**: {pred_p1_min}〜{pred_p1_max}nm （比率:"
@@ -732,24 +807,23 @@ with tab3:
                 f" {row.get('emulsifier', '')}）"
             )
 
+            w_amt = row.get("water_amount", "-")
+            o_amt = row.get("oil_amount", "-")
+            o_rat = row.get("oil_ratio", 0.0)
             d50_init = row.get("initial_d50", "-")
             d50_after = row.get("after_d50", "-")
             d_d50 = row.get("delta_d50", 0)
-            p1_min = row.get("peak1_min", 50)
-            p1_max = row.get("peak1_max", 500)
-            p1_rat = row.get("peak1_ratio", 95)
-            p2_min = row.get("peak2_min", 500)
-            p2_max = row.get("peak2_max", 5000)
-            p2_rat = row.get("peak2_ratio", 5)
+            p2_rat = row.get("peak2_ratio", 5.0)
 
             st.write(
                 f"📅 **提出日**: {row.get('date', '不明')}  \n"
+                f"💧 **処方組成**: 水層 {w_amt}g / 油層 {o_amt}g （油分率:"
+                f" {float(o_rat):.1f}%）  \n"
                 f"🌡️ **試験条件**: 温度 {row.get('temperature', '-')}℃ / 期間"
                 f" {row.get('test_days', '-')}日  \n"
-                f"📈 **粒径ダイナミクス**: 初期 {d50_init}nm → 試験後"
+                f"📈 **ダイナミクス**: 初期 {d50_init}nm → 試験後"
                 f" {d50_after}nm (ΔD50: {float(d_d50):+.1f}nm)  \n"
-                f"📊 **ピーク範囲指定**: 山1({p1_min}〜{p1_max}nm: {p1_rat}%) /"
-                f" 山2({p2_min}〜{p2_max}nm: {p2_rat}%)  \n"
+                f"📊 **第2ピーク比率**: {float(p2_rat)}%  \n"
                 f"⚖️ **判定**: {row.get('stability_text', '')}"
             )
             if "不安定" in str(row.get("stability_text", "")):
@@ -764,6 +838,16 @@ with tab3:
                   "処方番号・タグ",
                   value=str(row.get("prescription_no", "")),
                   key=f"edit_pres_{index}",
+              )
+              edit_water = st.number_input(
+                  "水層の量 (g)",
+                  value=float(row.get("water_amount", 80.0)),
+                  key=f"edit_water_{index}",
+              )
+              edit_oil = st.number_input(
+                  "油層の量 (g)",
+                  value=float(row.get("oil_amount", 20.0)),
+                  key=f"edit_oil_{index}",
               )
               edit_temp = st.number_input(
                   "試験 温度 (℃)",
@@ -780,11 +864,6 @@ with tab3:
                   value=float(row.get("after_d50", 220.0)),
                   key=f"edit_after_{index}",
               )
-              edit_p2_rat = st.number_input(
-                  "第2ピーク面積比 (%)",
-                  value=float(row.get("peak2_ratio", 5.0)),
-                  key=f"edit_p2_rat_{index}",
-              )
               edit_cond = st.text_input(
                   "その他メモ",
                   value=(
@@ -799,12 +878,17 @@ with tab3:
                 df["prescription_no"] = df["prescription_no"].astype(str)
                 df["condition"] = df["condition"].astype(str)
 
+                tot = edit_water + edit_oil
+                new_o_rat = (edit_oil / tot * 100.0) if tot > 0 else 0.0
+
                 df.loc[index, "prescription_no"] = str(edit_pres)
+                df.loc[index, "water_amount"] = float(edit_water)
+                df.loc[index, "oil_amount"] = float(edit_oil)
+                df.loc[index, "oil_ratio"] = float(new_o_rat)
                 df.loc[index, "temperature"] = float(edit_temp)
                 df.loc[index, "initial_d50"] = float(edit_init)
                 df.loc[index, "after_d50"] = float(edit_after)
                 df.loc[index, "delta_d50"] = float(edit_after - edit_init)
-                df.loc[index, "peak2_ratio"] = float(edit_p2_rat)
                 df.loc[index, "particle_size"] = float(edit_after)
                 df.loc[index, "condition"] = str(edit_cond)
                 df.to_csv(DATA_FILE, index=False)
@@ -852,18 +936,15 @@ with tab4:
       st.divider()
 
       st.subheader(
-          "🔬 2. 試験温度と粒子サイズの関係（安定・不安定の分布マップ）"
+          "🔬 2. 油分率と試験後の粒子サイズの関係（安定・不安定の分布マップ）"
       )
-      if (
-          "temperature" in df_stats.columns
-          and "after_d50" in df_stats.columns
-      ):
+      if "oil_ratio" in df_stats.columns and "after_d50" in df_stats.columns:
         chart_data = df_stats[
-            ["temperature", "after_d50", "status_label", "prescription_no"]
+            ["oil_ratio", "after_d50", "status_label", "prescription_no"]
         ]
         st.scatter_chart(
             chart_data,
-            x="temperature",
+            x="oil_ratio",
             y="after_d50",
             color="status_label",
             size=50,
