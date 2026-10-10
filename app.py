@@ -11,7 +11,7 @@ import streamlit as st
 # データの保存先CSV
 DATA_FILE = "dataset.csv"
 
-# --- ページ全体のデザイン設定（ブルー＆クリーンな知的人気テーマ） ---
+# --- ページ全体のデザイン設定（入力枠を白く見やすく改善） ---
 st.set_page_config(
     page_title="乳化安定性 予測AIアプリ", page_icon="🧪", layout="wide"
 )
@@ -19,7 +19,7 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* 全体の背景やタイトルのトーン調整 */
+    /* 全体の背景 */
     .stApp {
         background-color: #f4f7fb;
     }
@@ -27,6 +27,25 @@ st.markdown(
         color: #1e3a8a !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
+    
+    /* 📝 すべての入力フォーム・セレクトボックス・数値入力の枠を「白」くくっきりさせる */
+    input, select, textarea {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+    
+    /* Streamlitの各入力ウィジェットの中身（インプットボックス）を強制的に白背景にする */
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div, div[data-baseweb="base-input"] {
+        background-color: #ffffff !important;
+        border-color: #94a3b8 !important;
+    }
+    
+    /* 数値入力やテキスト入力のラベル文字を見やすく */
+    label {
+        color: #1e293b !important;
+        font-weight: 500;
+    }
+
     /* ボタンのカスタムデザイン（落ち着いたブルー） */
     .stButton>button {
         background-color: #1e3a8a;
@@ -40,7 +59,7 @@ st.markdown(
         background-color: #1d4ed8;
         color: white;
     }
-    /* 情報ボックスやコンテナの角丸・シャドウ */
+    /* コンテナの角丸・背景 */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {
         border-radius: 8px;
         border-color: #cbd5e1 !important;
@@ -592,4 +611,97 @@ with tab3:
                   value=float(row.get("particle_size", 200.0)),
                   key=f"edit_size_{index}",
               )
-              edit_turb = st.number_input
+              edit_turb = st.number_input(
+                  "濁度",
+                  value=float(row.get("turbidity", 1.0)),
+                  format="%.4f",
+                  step=0.0001,
+                  key=f"edit_turb_{index}",
+              )
+              edit_cond = st.text_input(
+                  "その他メモ",
+                  value=(
+                      str(row.get("condition", ""))
+                      if pd.notnull(row.get("condition"))
+                      else ""
+                  ),
+                  key=f"edit_cond_{index}",
+              )
+
+              if st.button("💾 変更を保存", key=f"save_edit_{index}"):
+                df["prescription_no"] = df["prescription_no"].astype(str)
+                df["condition"] = df["condition"].astype(str)
+
+                df.loc[index, "prescription_no"] = str(edit_pres)
+                df.loc[index, "temperature"] = float(edit_temp)
+                df.loc[index, "particle_size"] = float(edit_size)
+                df.loc[index, "turbidity"] = float(edit_turb)
+                df.loc[index, "condition"] = str(edit_cond)
+                df.to_csv(DATA_FILE, index=False)
+                st.success("更新しました！")
+                st.rerun()
+
+            st.write("")
+            with st.popover("✕ 削除"):
+              st.write("このデータを削除しますか？")
+              if st.button("はい、削除する", key=f"confirm_del_{index}"):
+                df = df.drop(index)
+                df.to_csv(DATA_FILE, index=False)
+                st.success("削除しました！")
+                st.rerun()
+
+# --- 4. 分析・統計（グラフ）タブ ---
+with tab4:
+  st.header("📈 実験データの分析・統計グラフ")
+  st.markdown(
+      "蓄積データから乳化剤別の傾向や粒径・温度の分布相関を可視化します。"
+  )
+
+  if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
+    st.write("まだ分析するためのデータがありません。データを登録してください。")
+  else:
+    df_stats = pd.read_csv(DATA_FILE)
+
+    if len(df_stats) < 1:
+      st.write("データが不足しています。")
+    else:
+      st.subheader("🧪 1. 乳化剤別のデータ登録数・安定傾向")
+      if "emulsifier" in df_stats.columns and "stability_text" in df_stats.columns:
+        df_stats["status_label"] = df_stats["stability_text"].apply(
+            lambda x: "安定" if str(x).startswith("安定") else "不安定"
+        )
+        counts = (
+            df_stats.groupby(["emulsifier", "status_label"])
+            .size()
+            .unstack(fill_value=0)
+        )
+        st.bar_chart(counts)
+      else:
+        st.write("集計に必要なデータ列がありません。")
+
+      st.divider()
+
+      st.subheader(
+          "🔬 2. 平均粒径と試験温度の関係（安定・不安定の分布マップ）"
+      )
+      if (
+          "temperature" in df_stats.columns
+          and "particle_size" in df_stats.columns
+      ):
+        chart_data = df_stats[
+            [
+                "temperature",
+                "particle_size",
+                "status_label",
+                "prescription_no",
+            ]
+        ]
+        st.scatter_chart(
+            chart_data,
+            x="temperature",
+            y="particle_size",
+            color="status_label",
+            size=50,
+        )
+      else:
+        st.write("散布図を描画するための数値データが不足しています。")
