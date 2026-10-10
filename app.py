@@ -61,8 +61,10 @@ with tab1:
       "実験・提出日", datetime.date.today(), key="sub_date"
   )
 
+  # 派生や温度付きの名前も自由に書き込める処方番号入力欄
   prescription_no = st.text_input(
-      "処方番号（例: FORM-001 など）", key="sub_prescription"
+      "処方番号・派生メモ（例: FORM-001, F200-40℃, FORM-001-rev2 など）",
+      key="sub_prescription",
   )
 
   emulsifier = st.selectbox(
@@ -110,7 +112,8 @@ with tab1:
     )
 
   condition_memo = st.text_input(
-      "その他メモ（例: 遠心分離 3000rpm など）", key="sub_condition"
+      "その他メモ（例: 遠心分離 3000rpm、ホモジナイザー条件など）",
+      key="sub_condition",
   )
 
   stability = st.radio(
@@ -129,7 +132,6 @@ with tab1:
         key="sub_unstable_days",
     )
 
-  # スマホからアクセスした場合はカメラ撮影も直接選択可能
   uploaded_file = st.file_uploader(
       "📸 コロイドの顕微鏡写真をアップロード（スマホからはその場でカメラ撮影も可）",
       type=["png", "jpg", "jpeg"],
@@ -188,11 +190,11 @@ with tab1:
     else:
       st.warning("写真をアップロードまたは撮影してください。")
 
-# --- 2. 予測・確認タブ（アラート通知機能付き） ---
+# --- 2. 予測・確認タブ（AIアドバイス・改善ヒント機能付き） ---
 with tab2:
-  st.header("AIによる安定性予測・リスクアラート")
+  st.header("AIによる安定性予測・改善アドバイス")
   st.info(
-      "現場で撮影・準備した顕微鏡写真と条件から、AIが分離リスクを詳細に診断します。"
+      "条件と顕微鏡写真からAIがリスクを診断し、不安定な場合の改善ヒントを自動提案します。"
   )
 
   pred_emulsifier = st.selectbox(
@@ -283,14 +285,12 @@ with tab2:
 
             st.subheader("📊 AIの判定結果")
 
-            # 🔔 リスクアラート機能の組み込み
             if prediction == 1:
               st.success(
                   f"判定：**9か月間安定**（予測確信度: {confidence:.1f}%）"
               )
               st.balloons()
             else:
-              # 過去の不安定データから平均何日目で不安定になったかを計算して警告に添える
               unstable_subset = train_clean[train_clean["is_stable"] == 0]
               avg_unstable_days = (
                   int(unstable_subset["days"].mean())
@@ -303,10 +303,32 @@ with tab2:
                   f"（予測確信度: {confidence:.1f}%）"
               )
               st.warning(
-                  f"⚠️ **注意喚起**: 過去の同条件・類似傾向のデータでは、平均して"
-                  f" **約 {avg_unstable_days} 日前後** で分離・クリーミングの"
-                  f"兆候が見られます。温度条件や粒径の再調整を推奨します。"
+                  f"⚠️ **注意喚起**: 過去の同条件データでは平均 **約"
+                  f" {avg_unstable_days} 日前後** で分離の兆候があります。"
               )
+
+              # 🤖 AIチャット風・改善アドバイスの自動生成
+              st.info("🤖 **AIからの改善ヒント・アドバイス**")
+              advice_list = []
+              if pred_size > 300:
+                advice_list.append(
+                    "・**粒径がやや大きめです**：ホモジナイザーの回転数を上げるか、乳化時間の延長を検討してください。"
+                )
+              if pred_temp > 50:
+                advice_list.append(
+                    "・**高温度帯での試験です**：熱耐性を高めるために、乳化剤の配合量を少し増やす（数%アップ）か、安定化剤の併用が有効です。"
+                )
+              if p_std > train_clean["img_std"].mean():
+                advice_list.append(
+                    "・**粒子サイズのばらつき（凝集）が見られます**：界面張力を下げるためにプレ乳化の条件を見直してみてください。"
+                )
+              if not advice_list:
+                advice_list.append(
+                    "・基本処方の微調整や、別系統の乳化剤（ポリグリやキラヤなど）との比較検討をおすすめします。"
+                )
+
+              for advice in advice_list:
+                st.write(advice)
 
             st.subheader("💡 判定の理由と分析")
             st.write(
@@ -326,8 +348,7 @@ with tab2:
             if p_std > train_clean["img_std"].mean():
               st.write(
                   "  - ⚠️ 過去のデータと比較して**粒子のバラつき（標準偏差）が"
-                  "大きめ**です。これが不安定化のリスク要因となっている可能性"
-                  "があります。"
+                  "大きめ**です。"
               )
             else:
               st.write(
@@ -337,11 +358,11 @@ with tab2:
     else:
       st.warning("確認用の写真をアップロードまたは撮影してください。")
 
-# --- 3. データ履歴・見返しタブ（編集機能付き） ---
+# --- 3. データ履歴・見返しタブ（派生管理・編集機能付き） ---
 with tab3:
   st.header("📁 提出データ履歴・見返し")
   st.info(
-      "これまで登録した実験データを確認・編集・削除できます。（最新20件まで表示）"
+      "処方番号や温度タグ（例: F200-40℃ など）で試行錯誤の歴史を追跡・編集できます。（最新20件まで表示）"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -359,7 +380,9 @@ with tab3:
     st.divider()
 
     search_query = st.text_input(
-        "🔍 処方番号で検索（部分一致）", "", key="hist_search_pres"
+        "🔍 処方番号・温度タグで検索（例: F200、40℃、FORM-001 など）",
+        "",
+        key="hist_search_pres",
     )
 
     col_f1, col_f2 = st.columns(2)
@@ -431,7 +454,8 @@ with tab3:
           with col2:
             pres_no = row.get("prescription_no", "未設定")
             st.markdown(
-                f"### 🏷️ 処方番号: {pres_no} （乳化剤: {row.get('emulsifier', '')}）"
+                f"### 🏷️ 処方番号・タグ: {pres_no} （乳化剤:"
+                f" {row.get('emulsifier', '')}）"
             )
 
             turb_val = row.get("turbidity", 0.0)
@@ -449,12 +473,14 @@ with tab3:
             )
             if "不安定" in str(row.get("stability_text", "")):
               st.write(f"⏱️ **不安定化までの日数**: {row.get('days', '')} 日")
+            if row.get("condition"):
+              st.write(f"📝 **メモ**: {row.get('condition')}")
 
           with col3:
             with st.popover("✏️ 編集"):
               st.write("### データの編集")
               edit_pres = st.text_input(
-                  "処方番号",
+                  "処方番号・タグ",
                   value=str(row.get("prescription_no", "")),
                   key=f"edit_pres_{index}",
               )
