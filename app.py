@@ -278,7 +278,94 @@ with tab1:
       )
 
   st.divider()
-  st.subheader("🌡️ 温度別（5℃ / 40℃）の試験後データ入力タブ")
+  # --- CSV自動解析・ピーク積分機能の追加 ---
+st.divider()
+st.subheader("📊 粒度分布CSV自動解析・ピーク積分ツール（新規追加機能）")
+st.markdown("粒度分布測定器のCSVファイルをアップロードすると、自動でグラフ化し、スライダーで範囲を指定して第1・第2ピークの積分値（面積比 %）を自動算出します。")
+
+with st.expander("📁 CSVファイルのアップロード & ピーク解析ツールを開く", expanded=False):
+    uploaded_csv = st.file_uploader("粒度分布CSVファイルを選択 (例: 粒径 vs 頻度)", type=["csv", "txt"], key="csv_peak_uploader")
+    
+    if uploaded_csv is not None:
+        try:
+            # エンコーディング自動判定またはフォールバック
+            bytes_data = uploaded_csv.getvalue()
+            df_csv = None
+            for enc in ['utf-8', 'shift-jis', 'cp932', 'latin1']:
+                try:
+                    uploaded_csv.seek(0)
+                    df_csv = pd.read_csv(uploaded_csv, encoding=enc)
+                    break
+                except Exception:
+                    continue
+            
+            if df_csv is not None and not df_csv.empty:
+                st.success("CSVファイルを正常に読み込みました！")
+                st.dataframe(df_csv.head(5), use_container_width=True)
+                
+                # 列の自動推定（数値列を探索）
+                numeric_cols = df_csv.select_dtypes(include=[np.number]).columns.tolist()
+                if len(numeric_cols) >= 2:
+                    col_x = st.selectbox("粒径データの列 (X軸: nm等)", numeric_cols, index=0, key="csv_col_x")
+                    col_y = st.selectbox("頻度/強度の列 (Y軸: %等)", numeric_cols, index=1 if len(numeric_cols)>1 else 0, key="csv_col_y")
+                    
+                    x_data = df_csv[col_x].values
+                    y_data = df_csv[col_y].values
+                    
+                    # グラフ描画
+                    import matplotlib.pyplot as plt
+                    fig, ax = plt.subplots(figsize=(10, 4))
+                    ax.plot(x_data, y_data, color="#1e3a8a", lw=2, label="粒度分布曲線")
+                    ax.set_xlabel("Particle Size (nm)")
+                    ax.set_ylabel("Frequency (%)")
+                    ax.set_title("Particle Size Distribution Curve")
+                    ax.grid(True, linestyle="--", alpha=0.6)
+                    
+                    # ピーク範囲スライダー
+                    xmin, xmax = float(np.min(x_data)), float(np.max(x_data))
+                    st.markdown("#### 🎛️ ピーク範囲の指定（スライダー）")
+                    col_sl1, col_sl2 = st.columns(2)
+                    with col_sl1:
+                        p1_range = st.slider("第1ピーク 範囲 (nm)", xmin, xmax, (xmin, min(xmin + (xmax-xmin)*0.5, xmax)), key="slider_p1")
+                    with col_sl2:
+                        p2_range = st.slider("第2ピーク 範囲 (nm)", xmin, xmax, (min(xmin + (xmax-xmin)*0.5, xmax), xmax), key="slider_p2")
+                    
+                    # 積分値（面積比）の計算
+                    mask_p1 = (x_data >= p1_range[0]) & (x_data <= p1_range[1])
+                    mask_p2 = (x_data >= p2_range[0]) & (x_data <= p2_range[1])
+                    
+                    area_total = np.trapz(y_data, x_data) if np.trapz(y_data, x_data) != 0 else 1.0
+                    area_p1 = np.trapz(y_data[mask_p1], x_data[mask_p1]) if np.sum(mask_p1) > 1 else 0.0
+                    area_p2 = np.trapz(y_data[mask_p2], x_data[mask_p2]) if np.sum(mask_p2) > 1 else 0.0
+                    
+                    ratio_p1 = (area_p1 / area_total * 100.0) if area_total > 0 else 0.0
+                    ratio_p2 = (area_p2 / area_total * 100.0) if area_total > 0 else 0.0
+                    
+                    # グラフに範囲をハイライト
+                    ax.fill_between(x_data, y_data, where=mask_p1, color='blue', alpha=0.3, label=f"第1ピーク 面積比: {ratio_p1:.1f}%")
+                    ax.fill_between(x_data, y_data, where=mask_p2, color='orange', alpha=0.3, label=f"第2ピーク 面積比: {ratio_p2:.1f}%")
+                    ax.legend()
+                    st.pyplot(fig)
+                    
+                    st.info(f"📊 **自動算出された積分値（面積比）**：\n- 第1ピーク ({p1_range[0]:.1f} ~ {p1_range[1]:.1f} nm): **{ratio_p1:.1f}%**\n- 第2ピーク ({p2_range[0]:.1f} ~ {p2_range[1]:.1f} nm): **{ratio_p2:.1f}%**")
+                    
+                    if st.button("✨ この計算結果を以下の入力フォーム（5℃/40℃）に反映する"):
+                        st.session_state["auto_p1_min"] = p1_range[0]
+                        st.session_state["auto_p1_max"] = p1_range[1]
+                        st.session_state["auto_p1_rat"] = ratio_p1
+                        st.session_state["auto_p2_min"] = p2_range[0]
+                        st.session_state["auto_p2_max"] = p2_range[1]
+                        st.session_state["auto_p2_rat"] = ratio_p2
+                        st.success("ピーク範囲と面積比をセッションに反映しました！下の入力フォームをご確認ください。")
+                else:
+                    st.warning("CSVファイルに数値データ列が2つ以上見つかりませんでした。")
+            else:
+                st.error("CSVファイルの読み込みに失敗しました。")
+        except Exception as e:
+            st.error(f"CSV解析エラー: {e}")
+
+st.divider()
+st.subheader("🌡️ 温度別（5℃ / 40℃）の試験後データ入力タブ")
   st.markdown(
       "それぞれの温度における試験後粒径・濁度・ピーク範囲・顕微鏡写真を"
       "入力してください。"
