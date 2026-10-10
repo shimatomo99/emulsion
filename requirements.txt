@@ -4,3 +4,5 @@ numpy
 scikit-learn
 pillow
 opencv-python-headless
+matplotlib
+tkinterdnd2
