@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（スリム化・表形式CSV出力対応版）"
+    "🧪 乳化安定性 予測AIアシスタント（乳化剤別選択・スリム化CSV対応版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>不要な項目を省き、主要な測定・評価データに絞って表形式CSVに出力できます。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>乳化剤ごとの一括選択やピーク面積比に絞った表形式CSV出力が可能です。</p>",
     unsafe_allow_html=True,
 )
 
@@ -278,9 +278,7 @@ with tab1:
 
   st.divider()
   st.subheader("🌡️ 温度別（5℃ / 40℃）の試験後データ入力タブ")
-  st.markdown(
-      "それぞれの温度における試験後粒径・濁度・ピーク面積を入力してください。"
-  )
+  st.markdown("それぞれの温度における試験後粒径・濁度・ピーク面積比を入力してください。")
 
   sub_tab_5c, sub_tab_40c = st.tabs(["❄️ 5℃ 試験データ", "🔥 40℃ 試験データ"])
 
@@ -333,45 +331,21 @@ with tab1:
           key="turb_5",
       )
 
-    st.markdown("#### 🔬 5℃ レーザー解析（ピーク面積）")
-    col_l1_5, col_l2_5 = st.columns(2)
-    with col_l1_5:
-      none_p1_5 = st.checkbox("5℃ 第1ピーク：データなし", key="chk_p1_5")
-      if none_p1_5:
-        peak1_area_5 = 0.0
-        st.text("（第1ピーク: なし）")
-      else:
-        peak1_area_5 = st.number_input(
-            "5℃ 第1ピーク 面積",
-            min_value=0.0,
-            value=100.0000,
-            step=0.0001,
-            format="%.4f",
-            key="p1_area_5",
-        )
-        peak1_start_5, peak1_end_5 = 50.0, 500.0  # 内部保持用デフォルト
-    with col_l2_5:
-      none_p2_5 = st.checkbox("5℃ 第2ピーク：データなし", key="chk_p2_5")
-      if none_p2_5:
-        peak2_area_5 = 0.0
-        st.text("（第2ピーク: なし）")
-      else:
-        peak2_area_5 = st.number_input(
-            "5℃ 第2ピーク 面積",
-            min_value=0.0,
-            value=10.0000,
-            step=0.0001,
-            format="%.4f",
-            key="p2_area_5",
-        )
-        peak2_start_5, peak2_end_5 = 500.0, 5000.0  # 内部保持用デフォルト
-
-    peak_ratio_5 = (
-        (peak1_area_5 / peak2_area_5)
-        if peak2_area_5 > 0
-        else (peak1_area_5 if peak1_area_5 > 0 else 0.0)
-    )
-    st.info(f"📊 算出された第1/第2ピーク面積比 (5℃): {peak_ratio_5:.4f}")
+    st.markdown("#### 🔬 5℃ レーザー解析（ピーク面積比）")
+    none_ratio_5 = st.checkbox("5℃ ピーク面積比データなし", key="chk_ratio_5")
+    if none_ratio_5:
+      peak_ratio_5 = 0.0
+      st.text("（ピーク面積比: なし）")
+    else:
+      peak_ratio_5 = st.number_input(
+          "5℃ 第1/第2ピーク面積比",
+          min_value=0.0,
+          value=10.0000,
+          step=0.0001,
+          format="%.4f",
+          key="sub_ratio_5",
+      )
+    peak1_area_5, peak2_area_5 = 0.0, 0.0
 
     file_5 = st.file_uploader(
         "5℃ 顕微鏡写真ファイルをアップロード",
@@ -428,45 +402,21 @@ with tab1:
           key="turb_40",
       )
 
-    st.markdown("#### 🔬 40℃ レーザー解析（ピーク面積）")
-    col_l1_40, col_l2_40 = st.columns(2)
-    with col_l1_40:
-      none_p1_40 = st.checkbox("40℃ 第1ピーク：データなし", key="chk_p1_40")
-      if none_p1_40:
-        peak1_area_40 = 0.0
-        st.text("（第1ピーク: なし）")
-      else:
-        peak1_area_40 = st.number_input(
-            "40℃ 第1ピーク 面積",
-            min_value=0.0,
-            value=100.0000,
-            step=0.0001,
-            format="%.4f",
-            key="p1_area_40",
-        )
-        peak1_start_40, peak1_end_40 = 50.0, 500.0
-    with col_l2_40:
-      none_p2_40 = st.checkbox("40℃ 第2ピーク：データなし", key="chk_p2_40")
-      if none_p2_40:
-        peak2_area_40 = 0.0
-        st.text("（第2ピーク: なし）")
-      else:
-        peak2_area_40 = st.number_input(
-            "40℃ 第2ピーク 面積",
-            min_value=0.0,
-            value=10.0000,
-            step=0.0001,
-            format="%.4f",
-            key="p2_area_40",
-        )
-        peak2_start_40, peak2_end_40 = 500.0, 5000.0
-
-    peak_ratio_40 = (
-        (peak1_area_40 / peak2_area_40)
-        if peak2_area_40 > 0
-        else (peak1_area_40 if peak1_area_40 > 0 else 0.0)
-    )
-    st.info(f"📊 算出された第1/第2ピーク面積比 (40℃): {peak_ratio_40:.4f}")
+    st.markdown("#### 🔬 40℃ レーザー解析（ピーク面積比）")
+    none_ratio_40 = st.checkbox("40℃ ピーク面積比データなし", key="chk_ratio_40")
+    if none_ratio_40:
+      peak_ratio_40 = 0.0
+      st.text("（ピーク面積比: なし）")
+    else:
+      peak_ratio_40 = st.number_input(
+          "40℃ 第1/第2ピーク面積比",
+          min_value=0.0,
+          value=10.0000,
+          step=0.0001,
+          format="%.4f",
+          key="sub_ratio_40",
+      )
+    peak1_area_40, peak2_area_40 = 0.0, 0.0
 
     file_40 = st.file_uploader(
         "40℃ 顕微鏡写真ファイルをアップロード",
@@ -475,11 +425,6 @@ with tab1:
     )
 
   st.divider()
-  condition_memo = st.text_input(
-      "共通メモ（例: ホモジナイザー条件、遠心分離など）",
-      value="",
-      key="sub_condition",
-  )
 
   stability = st.radio(
       "9か月以内の全体安定性判定（教師データ用）",
@@ -545,26 +490,14 @@ with tab1:
         "initial_turbidity": initial_turbidity if not none_turb_init else 0.0,
         "after_d50": after_d50_40,
         "delta_d50": delta_d50_40,
-        "peak1_start": peak1_start_40,
-        "peak1_end": peak1_end_40,
-        "peak1_area": peak1_area_40,
-        "peak2_start": peak2_start_40,
-        "peak2_end": peak2_end_40,
-        "peak2_area": peak2_area_40,
         "peak_ratio_40": peak_ratio_40,
-        "peak1_start_5": peak1_start_5,
-        "peak1_end_5": peak1_end_5,
-        "peak1_area_5": peak1_area_5,
-        "peak2_start_5": peak2_start_5,
-        "peak2_end_5": peak2_end_5,
-        "peak2_area_5": peak2_area_5,
         "peak_ratio_5": peak_ratio_5,
         "turbidity_5": turbidity_5,
         "after_d50_5": after_d50_5,
         "delta_d50_5": delta_d50_5,
         "particle_size": after_d50_40,
         "turbidity": turbidity_40,
-        "condition": str(condition_memo) if condition_memo else "",
+        "condition": "",
         "stability_text": stability,
         "is_stable": is_stable_val,
         "days": unstable_days,
@@ -702,10 +635,10 @@ with tab2:
 
 # --- 3. 処方グループ別まとめ・編集タブ ---
 with tab3:
-  st.header("📁 処方グループ別データまとめ・編集 & 選択式表形式CSV出力")
+  st.header("📁 処方グループ別データまとめ・編集 & 乳化剤別CSV出力")
   st.markdown(
-      "ダウンロードしたいデータ（複数選択可）を選び、指定された不要項目を除外した"
-      "すっきりした表形式のCSVとしてダウンロードできます。"
+      "乳化剤ごとに一括選択したり、個別に選択してスリム化した表形式CSVを"
+      "ダウンロードできます。"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -713,27 +646,48 @@ with tab3:
   else:
     df = pd.read_csv(DATA_FILE)
 
-    st.subheader("📥 選択式・表形式CSVダウンロード機能")
-    st.markdown(
-        "下のセレクトボックスから、CSVに出力したいデータ（処方番号と登録日）を"
-        "**複数選択**してください。"
-    )
+    st.subheader("📥 乳化剤別・選択式表形式CSVダウンロード")
+
+    # --- 乳化剤ごとの一括選択ボタン ---
+    st.markdown("#### 🏷️ 乳化剤ごとの一括選択ボタン")
+    col_btn_em1, col_btn_em2, col_btn_em3, col_btn_em4 = st.columns(4)
+
+    if "csv_selection_mode" not in st.session_state:
+      st.session_state.csv_selection_mode = "全選択"
+
+    if col_btn_em1.button("すべて選択"):
+      st.session_state.csv_selection_mode = "全選択"
+    if col_btn_em2.button("アラビアガムのみ"):
+      st.session_state.csv_selection_mode = "アラビアガム"
+    if col_btn_em3.button("ポリグリのみ"):
+      st.session_state.csv_selection_mode = "ポリグリ"
+    if col_btn_em4.button("キラヤのみ"):
+      st.session_state.csv_selection_mode = "キラヤ"
 
     df["select_label"] = (
         df.index.astype(str)
         + ": "
         + df["prescription_no"].astype(str)
-        + " (提出日: "
-        + df["date"].astype(str)
-        + " / 乳化剤: "
+        + " ("
         + df["emulsifier"].astype(str)
+        + " / 提出日: "
+        + df["date"].astype(str)
         + ")"
     )
 
+    # 選択モードに応じたデフォルトの選択肢を決定
+    if st.session_state.csv_selection_mode == "全選択":
+      default_labels = df["select_label"].tolist()
+    else:
+      target_emul = st.session_state.csv_selection_mode
+      default_labels = df[df["emulsifier"] == target_emul][
+          "select_label"
+      ].tolist()
+
     selected_labels = st.multiselect(
-        "出力するデータを選択（複数選択可。未選択の場合は全データ対象）",
+        "出力するデータを選択（乳化剤ボタンで一括選択できます。複数選択・個別変更も可）",
         options=df["select_label"].tolist(),
-        default=df["select_label"].tolist(),
+        default=default_labels,
     )
 
     if selected_labels:
@@ -744,7 +698,7 @@ with tab3:
     else:
       df_export_target = df.copy()
 
-    # --- ご指定の項目（実験日、水・油量、写真パス、ピーク上り下がり）を除外しスリム化した出力用マッピング ---
+    # --- ご要望の項目（不要項目を除外し、面積の代わりに面積比を入れたマッピング） ---
     export_columns_map = {
         "prescription_no": "処方コード",
         "emulsifier": "使用した乳化剤",
@@ -755,19 +709,14 @@ with tab3:
         "after_d50": "40℃試験後 平均粒径 (nm)",
         "delta_d50": "40℃粒径変動 Δd50 (nm)",
         "turbidity": "40℃ 試験後濁度",
-        "peak1_area": "40℃ 第1ピーク 面積",
-        "peak2_area": "40℃ 第2ピーク 面積",
         "peak_ratio_40": "第1/第2ピーク面積比 (40℃)",
         "test_days_5": "5℃試験 期間 (日)",
         "after_d50_5": "5℃試験後 平均粒径 (nm)",
         "delta_d50_5": "5℃粒径変動 Δd50 (nm)",
         "turbidity_5": "5℃ 試験後濁度",
-        "peak1_area_5": "5℃ 第1ピーク 面積",
-        "peak2_area_5": "5℃ 第2ピーク 面積",
         "peak_ratio_5": "第1/第2ピーク面積比 (5℃)",
         "stability_text": "9か月以内の全体安定性判定",
         "days": "不安定化日数 (日)",
-        "condition": "共通メモ",
         "particle_count": "画像解析 粒子数",
         "mean_area": "画像解析 平均面積",
         "circularity": "画像解析 円形度",
@@ -961,8 +910,6 @@ with tab3:
                   st.write(f"- 試験後平均粒径: {get_val('after_d50')} nm")
                   st.write(f"- 粒径変動 (Δ): {get_val('delta_d50')} nm")
                   st.write(f"- 試験後濁度: {get_val('turbidity')}")
-                  st.write(f"- 第1ピーク 面積: {get_val('peak1_area')}")
-                  st.write(f"- 第2ピーク 面積: {get_val('peak2_area')}")
                   st.write(
                       f"- **第1/第2ピーク面積比**: {get_val('peak_ratio_40')}"
                   )
@@ -971,18 +918,15 @@ with tab3:
                   st.markdown("#### ❄️ 5℃ 試験データ詳細")
                   st.write(f"- 5℃試験後平均粒径: {get_val('after_d50_5')} nm")
                   st.write(f"- 5℃試験後濁度: {get_val('turbidity_5')}")
-                  st.write(f"- 第1ピーク 面積: {get_val('peak1_area_5')}")
-                  st.write(f"- 第2ピーク 面積: {get_val('peak2_area_5')}")
                   st.write(
                       f"- **第1/第2ピーク面積比**: {get_val('peak_ratio_5')}"
                   )
 
                   st.markdown("---")
-                  st.markdown("#### 📋 総合判定・メモ")
+                  st.markdown("#### 📋 総合判定")
                   st.write(f"- 安定性判定: {get_val('stability_text')}")
                   if "不安定" in str(get_val("stability_text")):
                     st.write(f"- 不安定化までの日数: {get_val('days')} 日")
-                  st.write(f"- メモ: {get_val('condition')}")
 
                 st.write("")
                 with st.popover("🖥️ 編集"):
@@ -1094,35 +1038,16 @@ with tab3:
                         format="%.4f",
                         key=f"e_turb5_{index}",
                     )
-                    edit_p1_area_5 = st.number_input(
-                        "5℃ 第1ピーク 面積",
+                    edit_ratio_5 = st.number_input(
+                        "5℃ 第1/第2ピーク面積比",
                         value=float(
-                            row.get("peak1_area_5", 100.0)
-                            if pd.notnull(row.get("peak1_area_5"))
-                            else 100.0
-                        ),
-                        format="%.4f",
-                        step=0.0001,
-                        key=f"e_p1area5_{index}",
-                    )
-                    edit_p2_area_5 = st.number_input(
-                        "5℃ 第2ピーク 面積",
-                        value=float(
-                            row.get("peak2_area_5", 10.0)
-                            if pd.notnull(row.get("peak2_area_5"))
+                            row.get("peak_ratio_5", 10.0)
+                            if pd.notnull(row.get("peak_ratio_5"))
                             else 10.0
                         ),
                         format="%.4f",
                         step=0.0001,
-                        key=f"e_p2area5_{index}",
-                    )
-                    edit_p1_start_5, edit_p1_end_5 = (
-                        row.get("peak1_start_5", 50.0),
-                        row.get("peak1_end_5", 500.0),
-                    )
-                    edit_p2_start_5, edit_p2_end_5 = (
-                        row.get("peak2_start_5", 500.0),
-                        row.get("peak2_end_5", 5000.0),
+                        key=f"e_ratio5_{index}",
                     )
 
                   with edit_tab_40:
@@ -1154,48 +1079,19 @@ with tab3:
                         format="%.4f",
                         key=f"e_turb40_{index}",
                     )
-                    edit_p1_area_40 = st.number_input(
-                        "40℃ 第1ピーク 面積",
+                    edit_ratio_40 = st.number_input(
+                        "40℃ 第1/第2ピーク面積比",
                         value=float(
-                            row.get("peak1_area", 100.0)
-                            if pd.notnull(row.get("peak1_area"))
-                            else 100.0
-                        ),
-                        format="%.4f",
-                        step=0.0001,
-                        key=f"e_p1area40_{index}",
-                    )
-                    edit_p2_area_40 = st.number_input(
-                        "40℃ 第2ピーク 面積",
-                        value=float(
-                            row.get("peak2_area", 10.0)
-                            if pd.notnull(row.get("peak2_area"))
+                            row.get("peak_ratio_40", 10.0)
+                            if pd.notnull(row.get("peak_ratio_40"))
                             else 10.0
                         ),
                         format="%.4f",
                         step=0.0001,
-                        key=f"e_p2area40_{index}",
-                    )
-                    edit_p1_start_40, edit_p1_end_40 = (
-                        row.get("peak1_start", 50.0),
-                        row.get("peak1_end", 500.0),
-                    )
-                    edit_p2_start_40, edit_p2_end_40 = (
-                        row.get("peak2_start", 500.0),
-                        row.get("peak2_end", 5000.0),
+                        key=f"e_ratio40_{index}",
                     )
 
                   st.markdown("---")
-                  edit_cond = st.text_input(
-                      "その他メモ",
-                      value=(
-                          str(row.get("condition", ""))
-                          if pd.notnull(row.get("condition"))
-                          else ""
-                      ),
-                      key=f"e_cond_{index}",
-                  )
-
                   cur_stab = str(row.get("stability_text", "安定"))
                   edit_stability = st.radio(
                       "9か月以内の安定性",
@@ -1211,7 +1107,6 @@ with tab3:
                       "💾 すべての変更を保存する", key=f"save_edit_{index}"
                   ):
                     df["prescription_no"] = df["prescription_no"].astype(str)
-                    df["condition"] = df["condition"].astype(str)
 
                     tot = edit_water + edit_oil
                     new_o_rat = (edit_oil / tot * 100.0) if tot > 0 else 0.0
@@ -1219,17 +1114,6 @@ with tab3:
                     new_delta_5 = edit_after_5 - edit_init
                     new_is_stable = (
                         1 if edit_stability.startswith("安定") else 0
-                    )
-
-                    new_pr_40 = (
-                        (edit_p1_area_40 / edit_p2_area_40)
-                        if edit_p2_area_40 > 0
-                        else edit_p1_area_40
-                    )
-                    new_pr_5 = (
-                        (edit_p1_area_5 / edit_p2_area_5)
-                        if edit_p2_area_5 > 0
-                        else edit_p1_area_5
                     )
 
                     df.loc[index, "prescription_no"] = str(edit_pres)
@@ -1245,20 +1129,15 @@ with tab3:
                     df.loc[index, "after_d50"] = float(edit_after)
                     df.loc[index, "delta_d50"] = float(new_delta_40)
                     df.loc[index, "turbidity"] = float(edit_turb_40)
-                    df.loc[index, "peak1_area"] = float(edit_p1_area_40)
-                    df.loc[index, "peak2_area"] = float(edit_p2_area_40)
-                    df.loc[index, "peak_ratio_40"] = float(new_pr_40)
+                    df.loc[index, "peak_ratio_40"] = float(edit_ratio_40)
 
                     # 5℃データの反映
                     df.loc[index, "test_days_5"] = int(edit_test_days_5)
                     df.loc[index, "after_d50_5"] = float(edit_after_5)
                     df.loc[index, "delta_d50_5"] = float(new_delta_5)
                     df.loc[index, "turbidity_5"] = float(edit_turb_5)
-                    df.loc[index, "peak1_area_5"] = float(edit_p1_area_5)
-                    df.loc[index, "peak2_area_5"] = float(edit_p2_area_5)
-                    df.loc[index, "peak_ratio_5"] = float(new_pr_5)
+                    df.loc[index, "peak_ratio_5"] = float(edit_ratio_5)
 
-                    df.loc[index, "condition"] = str(edit_cond)
                     df.loc[index, "stability_text"] = edit_stability
                     df.loc[index, "is_stable"] = int(new_is_stable)
 
