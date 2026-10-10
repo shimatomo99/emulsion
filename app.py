@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（編集タブ対応・完全版）"
+    "🧪 乳化安定性 予測AIアシスタント（グラフ面積計算ツール埋め込み版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>データ提出時と同様に、編集画面でも5℃・40℃のタブで全パラメータを管理できます。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>データ提出時の各温度タブ内にCSVグラフの面積計算ツールを搭載しています。</p>",
     unsafe_allow_html=True,
 )
 
@@ -157,6 +157,162 @@ def extract_advanced_image_features(image_file):
     return 0.0, 0.0, 0.0, 0.0, 0.0
 
 
+# --- グラフ解析・面積計算を描画・処理するヘルパー関数 ---
+import matplotlib.pyplot as plt
+
+
+def render_graph_area_calculator(key_suffix):
+  st.markdown(
+      "📉 **CSVグラフ 面積計算ツール**（CSVファイルを選択して区間を指定できます）"
+  )
+
+  # セッションステートの初期化
+  df_key = f"calc_df_{key_suffix}"
+  x_key = f"calc_x_{key_suffix}"
+  y_key = f"calc_y_{key_suffix}"
+  asc_key = f"calc_asc_{key_suffix}"
+  desc_key = f"calc_desc_{key_suffix}"
+  area_key = f"calc_area_{key_suffix}"
+
+  if df_key not in st.session_state:
+    st.session_state[df_key] = None
+    st.session_state[x_key] = None
+    st.session_state[y_key] = None
+    st.session_state[asc_key] = None
+    st.session_state[desc_key] = None
+    st.session_state[area_key] = 0.0
+
+  uploaded_csv = st.file_uploader(
+      "解析用CSVファイルを選択", type=["csv"], key=f"csv_up_{key_suffix}"
+  )
+  if uploaded_csv is not None:
+    try:
+      temp_df = pd.read_csv(uploaded_csv)
+      if len(temp_df.columns) >= 2:
+        st.session_state[df_key] = temp_df
+        st.session_state[x_key] = temp_df.iloc[:, 0].values
+        st.session_state[y_key] = temp_df.iloc[:, 1].values
+    except Exception as e:
+      st.error(f"CSV読み込みエラー: {e}")
+
+  col_input1, col_input2, col_input3 = st.columns(3)
+  with col_input1:
+    ascent_val = st.number_input(
+        "上りはじめ (X)",
+        value=(
+            float(st.session_state[asc_key])
+            if st.session_state[asc_key] is not None
+            else 0.0
+        ),
+        key=f"input_asc_{key_suffix}",
+    )
+    st.session_state[asc_key] = (
+        ascent_val if ascent_val != 0.0 or st.session_state[asc_key] else None
+    )
+  with col_input2:
+    descent_val = st.number_input(
+        "下がり始め (X)",
+        value=(
+            float(st.session_state[desc_key])
+            if st.session_state[desc_key] is not None
+            else 0.0
+        ),
+        key=f"input_desc_{key_suffix}",
+    )
+    st.session_state[desc_key] = (
+        descent_val
+        if descent_val != 0.0 or st.session_state[desc_key]
+        else None
+    )
+  with col_input3:
+    # 面積の計算・表示
+    if (
+        st.session_state[asc_key] is not None
+        and st.session_state[desc_key] is not None
+        and st.session_state[x_key] is not None
+    ):
+      x_min = min(st.session_state[asc_key], st.session_state[desc_key])
+      x_max = max(st.session_state[asc_key], st.session_state[desc_key])
+      mask = (st.session_state[x_key] >= x_min) & (
+          st.session_state[x_key] <= x_max
+      )
+      if np.sum(mask) >= 2:
+        try:
+          calculated_area = np.trapezoid(
+              np.abs(st.session_state[y_key][mask]),
+              st.session_state[x_key][mask],
+          )
+        except AttributeError:
+          calculated_area = np.trapz(
+              np.abs(st.session_state[y_key][mask]),
+              st.session_state[x_key][mask],
+          )
+        st.session_state[area_key] = calculated_area
+        st.metric(label="計算された面積", value=f"{calculated_area:.4f}")
+      else:
+        st.metric(label="計算された面積", value="範囲のデータ不足")
+    else:
+      st.metric(label="計算された面積", value="-")
+
+  # グラフ描画
+  fig, ax = plt.subplots(figsize=(8, 4))
+  if st.session_state[x_key] is not None and st.session_state[y_key] is not None:
+    ax.plot(
+        st.session_state[x_key],
+        st.session_state[y_key],
+        marker="o",
+        linestyle="-",
+        color="royalblue",
+        markersize=3,
+        label="Data",
+    )
+    if st.session_state[asc_key] is not None:
+      idx1 = np.argmin(np.abs(st.session_state[x_key] - st.session_state[asc_key]))
+      ax.plot(
+          st.session_state[x_key][idx1],
+          st.session_state[y_key][idx1],
+          marker="o",
+          color="red",
+          markersize=8,
+          label="上りはじめ",
+      )
+    if st.session_state[desc_key] is not None:
+      idx2 = np.argmin(
+          np.abs(st.session_state[x_key] - st.session_state[desc_key])
+      )
+      ax.plot(
+          st.session_state[x_key][idx2],
+          st.session_state[y_key][idx2],
+          marker="o",
+          color="darkorange",
+          markersize=8,
+          label="下がり始め",
+      )
+    if (
+        st.session_state[asc_key] is not None
+        and st.session_state[desc_key] is not None
+    ):
+      x_min = min(st.session_state[asc_key], st.session_state[desc_key])
+      x_max = max(st.session_state[asc_key], st.session_state[desc_key])
+      mask = (st.session_state[x_key] >= x_min) & (
+          st.session_state[x_key] <= x_max
+      )
+      if np.sum(mask) >= 2:
+        ax.fill_between(
+            st.session_state[x_key][mask],
+            st.session_state[y_key][mask],
+            color="orange",
+            alpha=0.3,
+            label="面積範囲",
+        )
+    ax.grid(True, linestyle="--", alpha=0.6)
+    ax.legend()
+  else:
+    ax.set_title("CSVファイルをアップロードしてください")
+  st.pyplot(fig)
+  return st.session_state[area_key]
+
+
 # --- 1. データ提出・同時予測タブ ---
 with tab1:
   st.header("実験データの提出 & AI同時予測")
@@ -173,9 +329,12 @@ with tab1:
   with c_pres1:
     none_pres = st.checkbox("データなし", key="chk_sub_pres")
     if none_pres:
-      prescription_no = "データなし"
+      prescription_no = "data_none"
       st.text_input(
-          "処方コード", value="データなし", disabled=True, key="sub_prescription_dis"
+          "処方コード",
+          value="データなし",
+          disabled=True,
+          key="sub_prescription_dis",
       )
     else:
       prescription_no = st.text_input(
@@ -337,6 +496,11 @@ with tab1:
           key="turb_5",
       )
 
+    st.divider()
+    # 5℃用 面積計算ツールの埋め込み
+    calculated_area_5 = render_graph_area_calculator("5c")
+    st.divider()
+
     st.markdown("#### 🔬 5℃ レーザー解析（ピーク範囲）")
     col_l1_5, col_l2_5 = st.columns(2)
     with col_l1_5:
@@ -446,6 +610,11 @@ with tab1:
           format="%.4f",
           key="turb_40",
       )
+
+    st.divider()
+    # 40℃用 面積計算ツールの埋め込み
+    calculated_area_40 = render_graph_area_calculator("40c")
+    st.divider()
 
     st.markdown("#### 🔬 40℃ レーザー解析（ピーク範囲）")
     col_l1_40, col_l2_40 = st.columns(2)
@@ -572,6 +741,8 @@ with tab1:
           ),
           "after_d50": after_d50_40,
           "delta_d50": delta_d50_40,
+          "graph_area_40": calculated_area_40,
+          "graph_area_5": calculated_area_5,
           "peak1_min": peak1_min_40,
           "peak1_max": peak1_max_40,
           "peak1_ratio": peak1_ratio_40,
@@ -993,6 +1164,7 @@ with tab3:
                 d_d50 = row.get("delta_d50", 0)
 
                 d50_after_5 = row.get("after_d50_5", "-")
+                area_40 = row.get("graph_area_40", "-")
 
                 st.write(
                     f"📅 **提出日**: {row.get('date', '不明')}  \n"
@@ -1000,8 +1172,8 @@ with tab3:
                     f" {float(o_rat):.1f}%）  \n"
                     f"🔬 **共通初期値**: 初期粒径 {d50_init}nm / 虐待前濁度"
                     f" {turb_init}  \n"
-                    f"🔥 **40℃試験後**: {d50_after}nm (Δ: {float(d_d50):+.1f}nm)"
-                    f"  \n"
+                    f"🔥 **40℃試験後**: {d50_after}nm (Δ:"
+                    f" {float(d_d50):+.1f}nm) / 面積: {area_40}  \n"
                     f"❄️ **5℃試験後**: {d50_after_5}nm  \n"
                     f"⚖️ **判定**: {row.get('stability_text', '')}"
                 )
