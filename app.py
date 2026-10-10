@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（乳化剤別選択・スリム化CSV対応版）"
+    "🧪 乳化安定性 予測AIアシスタント（写真の追加・削除機能対応版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>乳化剤ごとの一括選択やピーク面積比に絞った表形式CSV出力が可能です。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>提出時や編集時に顕微鏡写真の追加・差し替え・削除が可能です。</p>",
     unsafe_allow_html=True,
 )
 
@@ -345,7 +345,6 @@ with tab1:
           format="%.4f",
           key="sub_ratio_5",
       )
-    peak1_area_5, peak2_area_5 = 0.0, 0.0
 
     file_5 = st.file_uploader(
         "5℃ 顕微鏡写真ファイルをアップロード",
@@ -416,7 +415,6 @@ with tab1:
           format="%.4f",
           key="sub_ratio_40",
       )
-    peak1_area_40, peak2_area_40 = 0.0, 0.0
 
     file_40 = st.file_uploader(
         "40℃ 顕微鏡写真ファイルをアップロード",
@@ -637,8 +635,7 @@ with tab2:
 with tab3:
   st.header("📁 処方グループ別データまとめ・編集 & 乳化剤別CSV出力")
   st.markdown(
-      "乳化剤ごとに一括選択したり、個別に選択してスリム化した表形式CSVを"
-      "ダウンロードできます。"
+      "乳化剤ごとの一括選択や、各データの編集画面からの写真の追加・削除が可能です。"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -648,7 +645,6 @@ with tab3:
 
     st.subheader("📥 乳化剤別・選択式表形式CSVダウンロード")
 
-    # --- 乳化剤ごとの一括選択ボタン ---
     st.markdown("#### 🏷️ 乳化剤ごとの一括選択ボタン")
     col_btn_em1, col_btn_em2, col_btn_em3, col_btn_em4 = st.columns(4)
 
@@ -675,7 +671,6 @@ with tab3:
         + ")"
     )
 
-    # 選択モードに応じたデフォルトの選択肢を決定
     if st.session_state.csv_selection_mode == "全選択":
       default_labels = df["select_label"].tolist()
     else:
@@ -685,7 +680,7 @@ with tab3:
       ].tolist()
 
     selected_labels = st.multiselect(
-        "出力するデータを選択（乳化剤ボタンで一括選択できます。複数選択・個別変更も可）",
+        "出力するデータを選択（複数選択・個別変更可）",
         options=df["select_label"].tolist(),
         default=default_labels,
     )
@@ -698,7 +693,6 @@ with tab3:
     else:
       df_export_target = df.copy()
 
-    # --- ご要望の項目（不要項目を除外し、面積の代わりに面積比を入れたマッピング） ---
     export_columns_map = {
         "prescription_no": "処方コード",
         "emulsifier": "使用した乳化剤",
@@ -1050,6 +1044,23 @@ with tab3:
                         key=f"e_ratio5_{index}",
                     )
 
+                    st.markdown("#### 📸 5℃ 顕微鏡写真の変更・削除")
+                    cur_img_5 = str(row.get("image_path_5", ""))
+                    if os.path.exists(cur_img_5):
+                      st.image(Image.open(cur_img_5), width=100)
+                      del_img_5 = st.checkbox(
+                          "5℃写真を削除する", key=f"del_img_5_{index}"
+                      )
+                    else:
+                      st.write("（現在5℃写真はありません）")
+                      del_img_5 = False
+
+                    new_edit_file_5 = st.file_uploader(
+                        "新しい5℃写真をアップロード（差し替え用）",
+                        type=["png", "jpg", "jpeg"],
+                        key=f"new_file_5_{index}",
+                    )
+
                   with edit_tab_40:
                     edit_test_days_40 = st.number_input(
                         "40℃試験 期間 (日)",
@@ -1091,6 +1102,23 @@ with tab3:
                         key=f"e_ratio40_{index}",
                     )
 
+                    st.markdown("#### 📸 40℃ 顕微鏡写真の変更・削除")
+                    cur_img_40 = str(row.get("image_path", ""))
+                    if os.path.exists(cur_img_40):
+                      st.image(Image.open(cur_img_40), width=100)
+                      del_img_40 = st.checkbox(
+                          "40℃写真を削除する", key=f"del_img_40_{index}"
+                      )
+                    else:
+                      st.write("（現在40℃写真はありません）")
+                      del_img_40 = False
+
+                    new_edit_file_40 = st.file_uploader(
+                        "新しい40℃写真をアップロード（差し替え用）",
+                        type=["png", "jpg", "jpeg"],
+                        key=f"new_file_40_{index}",
+                    )
+
                   st.markdown("---")
                   cur_stab = str(row.get("stability_text", "安定"))
                   edit_stability = st.radio(
@@ -1107,6 +1135,36 @@ with tab3:
                       "💾 すべての変更を保存する", key=f"save_edit_{index}"
                   ):
                     df["prescription_no"] = df["prescription_no"].astype(str)
+
+                    folder_map = {
+                        "アラビアガム": "data/arabic_gum",
+                        "ポリグリ": "data/polygly",
+                        "キラヤ": "data/quillaja",
+                    }
+                    save_dir = folder_map[edit_emulsifier]
+                    os.makedirs(save_dir, exist_ok=True)
+
+                    # 写真の削除・更新処理 (5℃)
+                    final_img_path_5 = cur_img_5
+                    if del_img_5:
+                      final_img_path_5 = ""
+                    if new_edit_file_5 is not None:
+                      final_img_path_5 = os.path.join(
+                          save_dir, "5c_" + new_edit_file_5.name
+                      )
+                      with open(final_img_path_5, "wb") as f:
+                        f.write(new_edit_file_5.getvalue())
+
+                    # 写真の削除・更新処理 (40℃)
+                    final_img_path_40 = cur_img_40
+                    if del_img_40:
+                      final_img_path_40 = ""
+                    if new_edit_file_40 is not None:
+                      final_img_path_40 = os.path.join(
+                          save_dir, "40c_" + new_edit_file_40.name
+                      )
+                      with open(final_img_path_40, "wb") as f:
+                        f.write(new_edit_file_40.getvalue())
 
                     tot = edit_water + edit_oil
                     new_o_rat = (edit_oil / tot * 100.0) if tot > 0 else 0.0
@@ -1130,6 +1188,7 @@ with tab3:
                     df.loc[index, "delta_d50"] = float(new_delta_40)
                     df.loc[index, "turbidity"] = float(edit_turb_40)
                     df.loc[index, "peak_ratio_40"] = float(edit_ratio_40)
+                    df.loc[index, "image_path"] = final_img_path_40
 
                     # 5℃データの反映
                     df.loc[index, "test_days_5"] = int(edit_test_days_5)
@@ -1137,12 +1196,15 @@ with tab3:
                     df.loc[index, "delta_d50_5"] = float(new_delta_5)
                     df.loc[index, "turbidity_5"] = float(edit_turb_5)
                     df.loc[index, "peak_ratio_5"] = float(edit_ratio_5)
+                    df.loc[index, "image_path_5"] = final_img_path_5
 
                     df.loc[index, "stability_text"] = edit_stability
                     df.loc[index, "is_stable"] = int(new_is_stable)
 
                     df.to_csv(DATA_FILE, index=False)
-                    st.success("すべての変更を正常に保存しました！")
+                    st.success(
+                        "すべての変更および写真を正常に保存しました！"
+                    )
                     st.rerun()
 
                 st.write("")
