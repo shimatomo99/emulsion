@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（ピーク別データなし一括切替対応）"
+    "🧪 乳化安定性 予測AIアシスタント（体裁整理・高度ダイナミクス解析対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>第一ピーク・第二ピークごとにまとめてデータなし設定が可能になりました。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>実験レポートの構成に合わせた見やすい入力レイアウトで、相分離予兆を高精度に診断します。</p>",
     unsafe_allow_html=True,
 )
 
@@ -160,7 +160,7 @@ def extract_advanced_image_features(image_file):
 # --- 1. データ提出タブ ---
 with tab1:
   st.header("実験データの提出")
-  st.markdown("処方組成、粒径ダイナミクス、ピーク範囲を登録します。")
+  st.markdown("処方組成、虐待試験条件、およびレーザー解析データを登録します。")
 
   submit_date = st.date_input(
       "実験・提出日", datetime.date.today(), key="sub_date"
@@ -250,7 +250,7 @@ with tab1:
     if none_init:
       initial_d50 = 0.0
       st.number_input(
-          "初期 平均粒径 (nm)", value=0.0, disabled=True, key="sub_init_dis"
+          "初期 平均粒径", value=0.0, disabled=True, key="sub_init_dis"
       )
     else:
       initial_d50 = st.number_input(
@@ -262,8 +262,37 @@ with tab1:
           key="sub_init_d50",
       )
 
-    st.markdown("---")
-    # --- 第一ピーク一括データなし設定 ---
+  with col_c2:
+    test_days = st.number_input(
+        "虐待試験 期間 (日)",
+        min_value=1,
+        max_value=365,
+        value=14,
+        step=1,
+        key="sub_test_days",
+    )
+
+    none_after = st.checkbox("データなし", key="chk_sub_after")
+    if none_after:
+      after_d50 = 0.0
+      st.number_input(
+          "試験後 平均粒径", value=0.0, disabled=True, key="sub_after_dis"
+      )
+    else:
+      after_d50 = st.number_input(
+          "試験終了後の 平均粒径 (nm)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=220.0,
+          step=10.0,
+          key="sub_after_d50",
+      )
+
+  # --- レーザー解析（粒度分布）セクション ---
+  st.subheader("🔬 レザー解析（粒度分布ピーク範囲）の入力")
+  col_l1, col_l2 = st.columns(2)
+
+  with col_l1:
     col_p1_title, col_p1_chk = st.columns([2, 1])
     with col_p1_title:
       st.markdown("#### 山1（第1ピーク）")
@@ -274,7 +303,7 @@ with tab1:
       peak1_min = 0.0
       peak1_max = 0.0
       peak1_ratio = 0.0
-      st.text("（第1ピーク: データなし設定中）")
+      st.text("（第1ピーク: データなし）")
     else:
       peak1_min = st.number_input(
           "第1ピーク 最小値 (nm)",
@@ -300,37 +329,7 @@ with tab1:
           key="sub_p1_ratio",
       )
 
-  with col_c2:
-    test_days = st.number_input(
-        "虐待試験 期間 (日)",
-        min_value=1,
-        max_value=365,
-        value=14,
-        step=1,
-        key="sub_test_days",
-    )
-
-    none_after = st.checkbox("データなし", key="chk_sub_after")
-    if none_after:
-      after_d50 = 0.0
-      st.number_input(
-          "試験後 平均粒径 (nm)",
-          value=0.0,
-          disabled=True,
-          key="sub_after_dis",
-      )
-    else:
-      after_d50 = st.number_input(
-          "試験終了後の 平均粒径 (nm)",
-          min_value=0.0,
-          max_value=10000.0,
-          value=220.0,
-          step=10.0,
-          key="sub_after_d50",
-      )
-
-    st.markdown("---")
-    # --- 第二ピーク一括データなし設定 ---
+  with col_l2:
     col_p2_title, col_p2_chk = st.columns([2, 1])
     with col_p2_title:
       st.markdown("#### 山2（第2ピーク）")
@@ -341,7 +340,7 @@ with tab1:
       peak2_min = 0.0
       peak2_max = 0.0
       peak2_ratio = 0.0
-      st.text("（第2ピーク: データなし設定中）")
+      st.text("（第2ピーク: データなし）")
     else:
       peak2_min = st.number_input(
           "第2ピーク 最小値 (nm)",
@@ -377,6 +376,8 @@ with tab1:
       f" {peak2_ratio if not none_peak2 else 0.0}%"
   )
 
+  # --- 濁度測定セクション ---
+  st.subheader("💧 濁度測定の入力")
   none_turb = st.checkbox("データなし", key="chk_sub_turb")
   if none_turb:
     turbidity = 0.0000
@@ -556,7 +557,7 @@ with tab2:
       f"📊 **予測時 油分率**: {pred_oil_ratio:.1f}% （総量: {pred_total:.1f}g）"
   )
 
-  st.subheader("🔍 予測時に評価する条件の入力")
+  st.subheader("📊 虐待試験条件の入力")
   col_p1, col_p2 = st.columns(2)
   with col_p1:
     pred_temp = st.number_input(
@@ -579,8 +580,32 @@ with tab2:
           key="pred_init_d50",
       )
 
-    st.markdown("---")
-    # --- 予測時 第一ピーク一括データなし設定 ---
+  with col_p2:
+    pred_test_days = st.number_input(
+        "予測時の試験 期間 (日)", value=14, key="pred_test_days"
+    )
+
+    none_p_after = st.checkbox("データなし", key="chk_pred_after")
+    if none_p_after:
+      pred_after_d50 = 0.0
+      st.number_input(
+          "試験後 平均粒径", value=0.0, disabled=True, key="pred_after_dis"
+      )
+    else:
+      pred_after_d50 = st.number_input(
+          "予測時の試験後 平均粒径 (nm)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=220.0,
+          step=10.0,
+          key="pred_after_d50",
+      )
+
+  # --- 予測時 レーザー解析（粒度分布）セクション ---
+  st.subheader("🔬 レザー解析（粒度分布ピーク範囲）の入力")
+  col_lp1, col_lp2 = st.columns(2)
+
+  with col_lp1:
     col_pp1_title, col_pp1_chk = st.columns([2, 1])
     with col_pp1_title:
       st.markdown("#### 予測時 山1（第1ピーク）")
@@ -591,7 +616,7 @@ with tab2:
       pred_p1_min = 0.0
       pred_p1_max = 0.0
       pred_p1_ratio = 0.0
-      st.text("（第1ピーク: データなし設定中）")
+      st.text("（第1ピーク: データなし）")
     else:
       pred_p1_min = st.number_input(
           "第1ピーク 最小値 (nm)",
@@ -617,29 +642,7 @@ with tab2:
           key="pred_p1_ratio",
       )
 
-  with col_p2:
-    pred_test_days = st.number_input(
-        "予測時の試験 期間 (日)", value=14, key="pred_test_days"
-    )
-
-    none_p_after = st.checkbox("データなし", key="chk_pred_after")
-    if none_p_after:
-      pred_after_d50 = 0.0
-      st.number_input(
-          "試験後 平均粒径", value=0.0, disabled=True, key="pred_after_dis"
-      )
-    else:
-      pred_after_d50 = st.number_input(
-          "予測時の試験後 平均粒径 (nm)",
-          min_value=0.0,
-          max_value=10000.0,
-          value=220.0,
-          step=10.0,
-          key="pred_after_d50",
-      )
-
-    st.markdown("---")
-    # --- 予測時 第二ピーク一括データなし設定 ---
+  with col_lp2:
     col_pp2_title, col_pp2_chk = st.columns([2, 1])
     with col_pp2_title:
       st.markdown("#### 予測時 山2（第2ピーク）")
@@ -650,7 +653,7 @@ with tab2:
       pred_p2_min = 0.0
       pred_p2_max = 0.0
       pred_p2_ratio = 0.0
-      st.text("（第2ピーク: データなし設定中）")
+      st.text("（第2ピーク: データなし）")
     else:
       pred_p2_min = st.number_input(
           "第2ピーク 最小値 (nm)",
@@ -686,6 +689,8 @@ with tab2:
       f"{pred_oil_ratio:.1f}% | **第2ピーク比率**: {pred_p2_ratio if not none_p_peak2 else 0.0}%"
   )
 
+  # --- 予測時 濁度測定セクション ---
+  st.subheader("💧 濁度測定の入力")
   none_p_turb = st.checkbox("データなし", key="chk_pred_turb")
   if none_p_turb:
     pred_turbidity = 0.0000
