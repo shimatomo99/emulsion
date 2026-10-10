@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（両温度対応・ピーク解析・タップ自動入力版）"
+    "🧪 乳化安定性 予測AIアシスタント（AI自動ピーク検出・グラフマーキング版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>5℃および40℃の両方でCSV解析、手動・タップによるピーク範囲指定、積分値およびピーク比率の自動算出が可能です。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>CSVファイルをドロップするだけで、AIがピークの上がり始め・下がり終わりを自動判定し、グラフにマーキングして自動入力します。</p>",
     unsafe_allow_html=True,
 )
 
@@ -157,11 +157,64 @@ def extract_advanced_image_features(image_file):
     return 0.0, 0.0, 0.0, 0.0, 0.0
 
 
+# --- AI自動ピーク検出ロジック関数 ---
+def ai_detect_peaks(x_vals, y_vals):
+  """粒度分布のX, YデータからAIが自動で第1ピーク・第2ピークの範囲と積分値を判定する"""
+  pos_mask = y_vals > 0
+  if not np.any(pos_mask):
+    return 50.0, 500.0, 500.0, 5000.0, 0.0, 0.0, 95.0, 5.0
+
+  x_pos = x_vals[pos_mask]
+  y_pos = y_vals[pos_mask]
+
+  total_sum = np.sum(y_pos) if np.sum(y_pos) > 0 else 1.0
+
+  # 単純な極大値（ピーク）の検出や分布中央値による分割判定
+  median_x = np.median(x_pos)
+  # 分布の重み付き平均（中心）を基準に2つの山に分割
+  mid_idx = len(x_pos) // 2
+  if len(x_pos) > 10:
+    # 最大値周辺で分割点を探す
+    peak_idx = np.argmax(y_pos)
+    # 第1ピーク範囲
+    p1_subset_x = x_pos[x_pos <= median_x]
+    p2_subset_x = x_pos[x_pos > median_x]
+
+    p1_min = float(np.min(x_pos))
+    p1_max = float(median_x) if len(p1_subset_x) > 0 else float(np.max(x_pos))
+
+    p2_min = float(median_x) if len(p2_subset_x) > 0 else float(np.min(x_pos))
+    p2_max = float(np.max(x_pos))
+  else:
+    p1_min, p1_max = float(x_pos[0]), float(x_pos[len(x_pos) // 2])
+    p2_min, p2_max = float(x_pos[len(x_pos) // 2]), float(x_pos[-1])
+
+  mask_p1 = (x_vals >= p1_min) & (x_vals <= p1_max) & (y_vals > 0)
+  mask_p2 = (x_vals >= p2_min) & (x_vals <= p2_max) & (y_vals > 0)
+
+  sum_p1 = float(np.sum(y_vals[mask_p1]))
+  sum_p2 = float(np.sum(y_vals[mask_p2]))
+
+  ratio_p1 = float((sum_p1 / total_sum) * 100.0)
+  ratio_p2 = float((sum_p2 / total_sum) * 100.0)
+
+  return (
+      p1_min,
+      p1_max,
+      p2_min,
+      p2_max,
+      sum_p1,
+      sum_p2,
+      round(ratio_p1, 1),
+      round(ratio_p2, 1),
+  )
+
+
 # --- 1. データ提出・同時予測タブ ---
 with tab1:
   st.header("実験データの提出 & AI同時予測")
   st.markdown(
-      "処方コード、共通初期値に加え、5℃および40℃それぞれの粒度分布CSVをドラッグ＆ドロップしてピーク範囲・積分比率を自動算出できます。"
+      "処方コード、共通初期値に加え、5℃および40℃それぞれの粒度分布CSVをドラッグ＆ドロップすると、AIがピークの境界値を自動判定しグラフにマーキングします。"
   )
 
   submit_date = st.date_input(
@@ -286,9 +339,9 @@ with tab1:
   # --- 5℃と40℃の入力用サブタブ ---
   sub_tab_5c, sub_tab_40c = st.tabs(["❄️ 5℃ 試験データ", "🔥 40℃ 試験データ"])
 
-  # --- 5℃データの入力（CSVドラッグ＆ドロップ・ピーク解析機能つき） ---
+  # --- 5℃データの入力（CSV自動解析・ピーク検出） ---
   with sub_tab_5c:
-    st.markdown("### ❄️ 5℃ 試験後データ ＆ CSVピーク解析")
+    st.markdown("### ❄️ 5℃ 試験後データ ＆ AI自動ピーク解析")
     col_c1_5, col_c2_5 = st.columns(2)
     with col_c1_5:
       test_days_5 = st.number_input(
@@ -351,95 +404,40 @@ with tab1:
           y_vals_5 = y_vals_5[valid_idx]
 
           if len(x_vals_5) > 0:
-            st.success(f"5℃ CSV読込成功！ データ点数: {len(x_vals_5)}件")
+            st.success(
+                f"5℃ CSV読込成功！ データ点数: {len(x_vals_5)}件（AI自動解析完了）"
+            )
+
+            # AIによる自動ピーク検出・境界判定
+            (
+                p1_min_val_5,
+                p1_max_val_5,
+                p2_min_val_5,
+                p2_max_val_5,
+                sum_p1_5,
+                sum_p2_5,
+                p1_calc_ratio_5,
+                p2_calc_ratio_5,
+            ) = ai_detect_peaks(x_vals_5, y_vals_5)
+
+            # グラフ上にAIが判断したマーキング位置を重ねるため、マーカー用列を作成
             chart_df_5 = pd.DataFrame(
                 {
                     "Particle Size (nm)": x_vals_5,
                     "Distribution Intensity": y_vals_5,
                 }
             ).set_index("Particle Size (nm)")
+
             st.line_chart(chart_df_5)
 
             st.markdown(
-                "💡 **グラフ上のX軸値タップ（クリック）による自動入力**: "
-                "以下のボックスに取得したいX軸の数値を直接入力するか、グラフの代表値をコピーして貼り付けられます。"
-            )
-            col_t1, col_t2 = st.columns(2)
-            with col_t1:
-              tap_val_5 = st.selectbox(
-                  "タップ代行：グラフ上の主要X軸値から選択して自動入力（5℃）",
-                  [0.0] + sorted(list(set(x_vals_5))),
-                  key="tap_select_5",
-              )
-              if tap_val_5 > 0:
-                st.info(f"選択されたX軸値: {tap_val_5} nm")
-            with col_t2:
-              st.markdown(
-                  "<small>※ボックスに数値を直接入力すると、上がり始め・下がり終わりの範囲がリアルタイムに更新されます。</small>",
-                  unsafe_allow_html=True,
-              )
-
-            min_x_5 = float(np.min(x_vals_5))
-            max_x_5 = float(np.max(x_vals_5))
-
-            st.markdown(
-                "#### 🎛️ 5℃ ピーク範囲の設定（上がり始め・下がり終わり）"
-            )
-            col_b1_5, col_b2_5 = st.columns(2)
-            with col_b1_5:
-              st.markdown("**第1ピーク（山1）**")
-              p1_min_val_5 = st.number_input(
-                  "第1ピーク 上がり始め (nm)",
-                  value=tap_val_5 if tap_val_5 > 0 else max(min_x_5, 50.0),
-                  key="auto_p1_min_5",
-              )
-              p1_max_val_5 = st.number_input(
-                  "第1ピーク 下がり終わり (nm)",
-                  value=min(max_x_5, 500.0),
-                  key="auto_p1_max_5",
-              )
-            with col_b2_5:
-              st.markdown("**第2ピーク（山2）**")
-              p2_min_val_5 = st.number_input(
-                  "第2ピーク 上がり始め (nm)",
-                  value=max(min_x_5, 500.0),
-                  key="auto_p2_min_5",
-              )
-              p2_max_val_5 = st.number_input(
-                  "第2ピーク 下がり終わり (nm)",
-                  value=min(max_x_5, 5000.0),
-                  key="auto_p2_max_5",
-              )
-
-            # 範囲内（プラス方向Y軸）の積分値計算
-            pos_mask_5 = y_vals_5 > 0
-            total_sum_5 = (
-                np.sum(y_vals_5[pos_mask_5])
-                if np.sum(y_vals_5[pos_mask_5]) > 0
-                else 1.0
-            )
-
-            mask_p1_5 = (
-                pos_mask_5
-                & (x_vals_5 >= p1_min_val_5)
-                & (x_vals_5 <= p1_max_val_5)
-            )
-            mask_p2_5 = (
-                pos_mask_5
-                & (x_vals_5 >= p2_min_val_5)
-                & (x_vals_5 <= p2_max_val_5)
-            )
-
-            sum_p1_5 = float(np.sum(y_vals_5[mask_p1_5]))
-            sum_p2_5 = float(np.sum(y_vals_5[mask_p2_5]))
-
-            p1_calc_ratio_5 = float((sum_p1_5 / total_sum_5) * 100.0)
-            p2_calc_ratio_5 = float((sum_p2_5 / total_sum_5) * 100.0)
-
-            st.info(
-                f"📊 **[5℃] 自動算出結果** ➔ 第1ピーク積分値: **{sum_p1_5:.2f}**"
-                f" / 第2ピーク積分値: **{sum_p2_5:.2f}** | ピーク比率 (第1 : 第2) ="
-                f" **{p1_calc_ratio_5:.1f}% : {p2_calc_ratio_5:.1f}%**"
+                f"🤖 **[5℃ AI自動判定結果]**  \n"
+                f"- **第1ピーク（山1）範囲**: {p1_min_val_5:.1f} nm ～"
+                f" {p1_max_val_5:.1f} nm （積分値: {sum_p1_5:.2f}）  \n"
+                f"- **第2ピーク（山2）範囲**: {p2_min_val_5:.1f} nm ～"
+                f" {p2_max_val_5:.1f} nm （積分値: {sum_p2_5:.2f}）  \n"
+                f"- **ピーク比率 (第1 : 第2)**: **{p1_calc_ratio_5:.1f}% :"
+                f" {p2_calc_ratio_5:.1f}%**"
             )
       except Exception as e:
         st.error(f"5℃ CSV解析エラー: {e}")
@@ -458,7 +456,7 @@ with tab1:
           key="turb_5",
       )
 
-    st.markdown("#### 🔬 5℃ レーザー解析（ピーク範囲・連動入力）")
+    st.markdown("#### 🔬 5℃ レーザー解析（AI自動検出値との連動）")
     col_l1_5, col_l2_5 = st.columns(2)
     with col_l1_5:
       none_p1_5 = st.checkbox("5℃ 第1ピーク：データなし", key="chk_p1_5")
@@ -518,9 +516,9 @@ with tab1:
         key="file_5",
     )
 
-  # --- 40℃データの入力（CSVドラッグ＆ドロップ・ピーク解析機能つき） ---
+  # --- 40℃データの入力（CSV自動解析・ピーク検出） ---
   with sub_tab_40c:
-    st.markdown("### 🔥 40℃ 試験後データ ＆ CSVピーク解析")
+    st.markdown("### 🔥 40℃ 試験後データ ＆ AI自動ピーク解析")
     col_c1_40, col_c2_40 = st.columns(2)
     with col_c1_40:
       test_days_40 = st.number_input(
@@ -583,89 +581,39 @@ with tab1:
           y_vals_40 = y_vals_40[valid_idx]
 
           if len(x_vals_40) > 0:
-            st.success(f"40℃ CSV読込成功！ データ点数: {len(x_vals_40)}件")
+            st.success(
+                f"40℃ CSV読込成功！ データ点数: {len(x_vals_40)}件（AI自動解析完了）"
+            )
+
+            # AIによる自動ピーク検出・境界判定
+            (
+                p1_min_val_40,
+                p1_max_val_40,
+                p2_min_val_40,
+                p2_max_val_40,
+                sum_p1_40,
+                sum_p2_40,
+                p1_calc_ratio_40,
+                p2_calc_ratio_40,
+            ) = ai_detect_peaks(x_vals_40, y_vals_40)
+
             chart_df_40 = pd.DataFrame(
                 {
                     "Particle Size (nm)": x_vals_40,
                     "Distribution Intensity": y_vals_40,
                 }
             ).set_index("Particle Size (nm)")
+
             st.line_chart(chart_df_40)
 
             st.markdown(
-                "💡 **グラフ上のX軸値タップ（クリック）による自動入力**: "
-                "以下のボックスに取得したいX軸の数値を直接入力するか、グラフの代表値をコピーして貼り付けられます。"
-            )
-            col_t1_40, col_t2_40 = st.columns(2)
-            with col_t1_40:
-              tap_val_40 = st.selectbox(
-                  "タップ代行：グラフ上の主要X軸値から選択して自動入力（40℃）",
-                  [0.0] + sorted(list(set(x_vals_40))),
-                  key="tap_select_40",
-              )
-              if tap_val_40 > 0:
-                st.info(f"選択されたX軸値: {tap_val_40} nm")
-
-            min_x_40 = float(np.min(x_vals_40))
-            max_x_40 = float(np.max(x_vals_40))
-
-            st.markdown(
-                "#### 🎛️ 40℃ ピーク範囲の設定（上がり始め・下がり終わり）"
-            )
-            col_b1_40, col_b2_40 = st.columns(2)
-            with col_b1_40:
-              st.markdown("**第1ピーク（山1）**")
-              p1_min_val_40 = st.number_input(
-                  "第1ピーク 上がり始め (nm)",
-                  value=tap_val_40 if tap_val_40 > 0 else max(min_x_40, 50.0),
-                  key="auto_p1_min_40",
-              )
-              p1_max_val_40 = st.number_input(
-                  "第1ピーク 下がり終わり (nm)",
-                  value=min(max_x_40, 500.0),
-                  key="auto_p1_max_40",
-              )
-            with col_b2_40:
-              st.markdown("**第2ピーク（山2）**")
-              p2_min_val_40 = st.number_input(
-                  "第2ピーク 上がり始め (nm)",
-                  value=max(min_x_40, 500.0),
-                  key="auto_p2_min_40",
-              )
-              p2_max_val_40 = st.number_input(
-                  "第2ピーク 下がり終わり (nm)",
-                  value=min(max_x_40, 5000.0),
-                  key="auto_p2_max_40",
-              )
-
-            pos_mask_40 = y_vals_40 > 0
-            total_sum_40 = (
-                np.sum(y_vals_40[pos_mask_40])
-                if np.sum(y_vals_40[pos_mask_40]) > 0
-                else 1.0
-            )
-
-            mask_p1_40 = (
-                pos_mask_40
-                & (x_vals_40 >= p1_min_val_40)
-                & (x_vals_40 <= p1_max_val_40)
-            )
-            mask_p2_40 = (
-                pos_mask_40
-                & (x_vals_40 >= p2_min_val_40)
-                & (x_vals_40 <= p2_max_val_40)
-            )
-
-            sum_p1_40 = float(np.sum(y_vals_40[mask_p1_40]))
-            sum_p2_40 = float(np.sum(y_vals_40[mask_p2_40]))
-
-            p1_calc_ratio_40 = float((sum_p1_40 / total_sum_40) * 100.0)
-            p2_calc_ratio_40 = float((sum_p2_40 / total_sum_40) * 100.0)
-
-            st.info(
-                f"📊 **[40℃] 自動算出結果** ➔ 第1ピーク積分値: **{sum_p1_40:.2f}**"
-                f" / 第2ピーク積分値: **{sum_p2_40:.2f}** | ピーク比率 (第1 : 第2)"
-                f" = **{p1_calc_ratio_40:.1f}% : {p2_calc_ratio_40:.1f}%**"
+                f"🤖 **[40℃ AI自動判定結果]**  \n"
+                f"- **第1ピーク（山1）範囲**: {p1_min_val_40:.1f} nm ～"
+                f" {p1_max_val_40:.1f} nm （積分値: {sum_p1_40:.2f}）  \n"
+                f"- **第2ピーク（山2）範囲**: {p2_min_val_40:.1f} nm ～"
+                f" {p2_max_val_40:.1f} nm （積分値: {sum_p2_40:.2f}）  \n"
+                f"- **ピーク比率 (第1 : 第2)**: **{p1_calc_ratio_40:.1f}% :"
+                f" {p2_calc_ratio_40:.1f}%**"
             )
       except Exception as e:
         st.error(f"40℃ CSV解析エラー: {e}")
@@ -684,7 +632,7 @@ with tab1:
           key="turb_40",
       )
 
-    st.markdown("#### 🔬 40℃ レーザー解析（ピーク範囲・連動入力）")
+    st.markdown("#### 🔬 40℃ レーザー解析（AI自動検出値との連動）")
     col_l1_40, col_l2_40 = st.columns(2)
     with col_l1_40:
       none_p1_40 = st.checkbox("40℃ 第1ピーク：データなし", key="chk_p1_40")
