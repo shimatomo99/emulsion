@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（選択式・表形式CSV出力対応版）"
+    "🧪 乳化安定性 予測AIアシスタント（全項目完全網羅CSV出力対応版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>必要なデータを選択して、処方番号と入力項目を整理した表形式でCSVダウンロードできます。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>データ提出画面のすべての項目および画像解析データをもれなく表形式CSVに出力できます。</p>",
     unsafe_allow_html=True,
 )
 
@@ -584,6 +584,7 @@ with tab1:
         "oil_ratio": oil_ratio,
         "temperature": 40.0,
         "test_days": test_days_40,
+        "test_days_5": test_days_5,
         "initial_d50": initial_d50,
         "initial_turbidity": initial_turbidity if not none_turb_init else 0.0,
         "after_d50": after_d50_40,
@@ -601,6 +602,7 @@ with tab1:
         "peak2_start_5": peak2_start_5,
         "peak2_end_5": peak2_end_5,
         "peak2_area_5": peak2_area_5,
+        "peak_ratio_5": peak_ratio_5,
         "turbidity_5": turbidity_5,
         "after_d50_5": after_d50_5,
         "delta_d50_5": delta_d50_5,
@@ -761,7 +763,6 @@ with tab3:
         "**複数選択**してください。"
     )
 
-    # 選択用のラベル作成（ID付きで識別しやすくする）
     df["select_label"] = (
         df.index.astype(str)
         + ": "
@@ -779,7 +780,6 @@ with tab3:
         default=df["select_label"].tolist(),
     )
 
-    # 選択された行の抽出
     if selected_labels:
       selected_indices = [
           int(label.split(":")[0]) for label in selected_labels
@@ -788,43 +788,51 @@ with tab3:
     else:
       df_export_target = df.copy()
 
-    # --- ユーザーご希望の「処方番号と対応する入力項目を綺麗に表にする」ためのカラム整形 ---
+    # --- データ提出画面で入力されたすべての項目を完全に網羅した出力用マッピング ---
     export_columns_map = {
-        "prescription_no": "処方番号",
+        "prescription_no": "処方コード",
         "date": "実験・提出日",
-        "emulsifier": "乳化剤",
-        "water_amount": "水層の量(g)",
-        "oil_amount": "油層の量(g)",
-        "oil_ratio": "油分率(%)",
-        "initial_d50": "初期平均粒径(nm)",
-        "initial_turbidity": "虐待前初期濁度",
-        "test_days": "試験期間(日)",
-        "after_d50": "40℃試験後平均粒径(nm)",
-        "delta_d50": "40℃粒径変動(Δnm)",
-        "turbidity": "40℃試験後濁度",
-        "peak1_start": "40℃第1ピーク上りはじめ(nm)",
-        "peak1_end": "40℃第1ピーク下がり終わり(nm)",
-        "peak1_area": "40℃第1ピーク面積",
-        "peak2_start": "40℃第2ピーク上りはじめ(nm)",
-        "peak2_end": "40℃第2ピーク下がり終わり(nm)",
-        "peak2_area": "40℃第2ピーク面積",
-        "peak_ratio_40": "40℃第1/第2ピーク面積比",
-        "after_d50_5": "5℃試験後平均粒径(nm)",
-        "delta_d50_5": "5℃粒径変動(Δnm)",
-        "turbidity_5": "5℃試験後濁度",
-        "peak1_start_5": "5℃第1ピーク上りはじめ(nm)",
-        "peak1_end_5": "5℃第1ピーク下がり終わり(nm)",
-        "peak1_area_5": "5℃第1ピーク面積",
-        "peak2_start_5": "5℃第2ピーク上りはじめ(nm)",
-        "peak2_end_5": "5℃第2ピーク下がり終わり(nm)",
-        "peak2_area_5": "5℃第2ピーク面積",
-        "peak_ratio_5": "5℃第1/第2ピーク面積比",
-        "stability_text": "総合安定性判定",
-        "days": "不安定化日数(日)",
-        "condition": "メモ",
+        "emulsifier": "使用した乳化剤",
+        "water_amount": "水層の量 (g/mL)",
+        "oil_amount": "油層の量 (g/mL)",
+        "oil_ratio": "油分率 (%)",
+        "initial_d50": "初期平均粒径 (nm)",
+        "initial_turbidity": "虐待前（初期）濁度",
+        "test_days": "40℃試験 期間 (日)",
+        "after_d50": "40℃試験後 平均粒径 (nm)",
+        "delta_d50": "40℃粒径変動 Δd50 (nm)",
+        "turbidity": "40℃ 試験後濁度",
+        "peak1_start": "40℃ 第1ピーク上りはじめ (nm)",
+        "peak1_end": "40℃ 第1ピーク下がり終わり (nm)",
+        "peak1_area": "40℃ 第1ピーク 面積",
+        "peak2_start": "40℃ 第2ピーク上りはじめ (nm)",
+        "peak2_end": "40℃ 第2ピーク下がり終わり (nm)",
+        "peak2_area": "40℃ 第2ピーク 面積",
+        "peak_ratio_40": "第1/第2ピーク面積比 (40℃)",
+        "test_days_5": "5℃試験 期間 (日)",
+        "after_d50_5": "5℃試験後 平均粒径 (nm)",
+        "delta_d50_5": "5℃粒径変動 Δd50 (nm)",
+        "turbidity_5": "5℃ 試験後濁度",
+        "peak1_start_5": "5℃ 第1ピーク上りはじめ (nm)",
+        "peak1_end_5": "5℃ 第1ピーク下がり終わり (nm)",
+        "peak1_area_5": "5℃ 第1ピーク 面積",
+        "peak2_start_5": "5℃ 第2ピーク上りはじめ (nm)",
+        "peak2_end_5": "5℃ 第2ピーク下がり終わり (nm)",
+        "peak2_area_5": "5℃ 第2ピーク 面積",
+        "peak_ratio_5": "第1/第2ピーク面積比 (5℃)",
+        "stability_text": "9か月以内の全体安定性判定",
+        "days": "不安定化日数 (日)",
+        "condition": "共通メモ",
+        "particle_count": "画像解析 粒子数",
+        "mean_area": "画像解析 平均面積",
+        "circularity": "画像解析 円形度",
+        "img_mean": "画像解析 輝度平均",
+        "img_std": "画像解析 輝度標準偏差",
+        "image_path": "40℃顕微鏡写真パス",
+        "image_path_5": "5℃顕微鏡写真パス",
     }
 
-    # 存在するカラムのみに絞ってリネーム
+    # 存在するカラムのみに絞ってリネームし、すべての入力項目を出力
     existing_cols = [
         c for c in export_columns_map.keys() if c in df_export_target.columns
     ]
@@ -835,9 +843,9 @@ with tab3:
     csv_data = df_formatted_export.to_csv(index=False).encode("utf-8-sig")
 
     st.download_button(
-        label="📥 選択したデータを表形式CSVでダウンロード",
+        label="📥 選択したデータを全項目表形式CSVでダウンロード",
         data=csv_data,
-        file_name="emulsion_selected_prescription_table.csv",
+        file_name="emulsion_complete_prescription_table.csv",
         mime="text/csv",
     )
     st.divider()
@@ -1135,8 +1143,8 @@ with tab3:
                     edit_test_days_5 = st.number_input(
                         "5℃試験 期間 (日)",
                         value=int(
-                            row.get("test_days", 14)
-                            if pd.notnull(row.get("test_days"))
+                            row.get("test_days_5", 14)
+                            if pd.notnull(row.get("test_days_5"))
                             else 14
                         ),
                         key=f"e_days_5_{index}",
@@ -1376,6 +1384,7 @@ with tab3:
                     df.loc[index, "peak_ratio_40"] = float(new_pr_40)
 
                     # 5℃データの反映
+                    df.loc[index, "test_days_5"] = int(edit_test_days_5)
                     df.loc[index, "after_d50_5"] = float(edit_after_5)
                     df.loc[index, "delta_d50_5"] = float(new_delta_5)
                     df.loc[index, "turbidity_5"] = float(edit_turb_5)
