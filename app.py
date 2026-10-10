@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（5℃・40℃タブ別入力対応）"
+    "🧪 乳化安定性 予測AIアシスタント（初期値共通化・タブ別入力対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>5℃試験データと40℃試験データをタブで切り替えてそれぞれ入力・保存できます。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>製造直後の初期粒径と初期濁度を共通入力し、5℃・40℃の試験後データをタブでそれぞれ管理できます。</p>",
     unsafe_allow_html=True,
 )
 
@@ -161,8 +161,8 @@ def extract_advanced_image_features(image_file):
 with tab1:
   st.header("実験データの提出 & AI同時予測")
   st.markdown(
-      "処方コードや組成を入力し、5℃および40℃それぞれの試験データ（粒径・ピーク"
-      "・濁度・写真など）をタブで入力して提出します。"
+      "処方コード、共通の初期測定値（粒径・濁度）、および5℃・40℃それぞれの"
+      "試験後データを入力して提出します。"
   )
 
   submit_date = st.date_input(
@@ -234,13 +234,54 @@ with tab1:
       f" {total_amount:.1f}g / 水層 {water_amount}g : 油層 {oil_amount}g）"
   )
 
+  # --- タブの外（共通項目）：初期平均粒径 ＆ 虐待前（初期）濁度 ---
   st.divider()
-  st.subheader(
-      "🌡️ 温度別（5℃ / 40℃）の測定データ入力タブ"
-  )
+  st.subheader("🔬 共通の初期測定値（虐待前）")
+  st.markdown("すべての温度条件で共通となる製造直後の測定値です。")
+
+  col_init1, col_init2 = st.columns(2)
+  with col_init1:
+    none_init = st.checkbox("初期平均粒径データなし", key="chk_sub_init_common")
+    if none_init:
+      initial_d50 = 0.0
+      st.number_input(
+          "初期平均粒径", value=0.0, disabled=True, key="sub_init_dis"
+      )
+    else:
+      initial_d50 = st.number_input(
+          "製造直後の初期 平均粒径 (nm)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=200.0,
+          step=10.0,
+          key="sub_init_d50",
+      )
+
+  with col_init2:
+    none_turb_init = st.checkbox(
+        "虐待前（初期）濁度データなし", key="chk_sub_turb_init_common"
+    )
+    if none_turb_init:
+      initial_turbidity = 0.0
+      st.number_input(
+          "虐待前濁度", value=0.0, disabled=True, key="sub_turb_init_dis"
+      )
+    else:
+      initial_turbidity = st.number_input(
+          "虐待前（初期）濁度",
+          min_value=0.0,
+          max_value=10.0,
+          value=1.0000,
+          step=0.0001,
+          format="%.4f",
+          key="sub_turb_init",
+      )
+
+  st.divider()
+  st.subheader("🌡️ 温度別（5℃ / 40℃）の試験後データ入力タブ")
   st.markdown(
-      "それぞれの温度における粒径・ピーク範囲・濁度・顕微鏡写真を入力して"
-      "ください。"
+      "それぞれの温度における試験後粒径・ピーク範囲・濁度・顕微鏡写真を"
+      "入力してください。"
   )
 
   # --- 5℃と40℃の入力用サブタブ ---
@@ -248,7 +289,7 @@ with tab1:
 
   # --- 5℃データの入力 ---
   with sub_tab_5c:
-    st.markdown("### ❄️ 5℃ 試験条件・測定値")
+    st.markdown("### ❄️ 5℃ 試験後データ")
     col_c1_5, col_c2_5 = st.columns(2)
     with col_c1_5:
       test_days_5 = st.number_input(
@@ -259,23 +300,8 @@ with tab1:
           step=1,
           key="sub_days_5",
       )
-      none_init_5 = st.checkbox("初期粒径データなし", key="chk_init_5")
-      if none_init_5:
-        initial_d50_5 = 0.0
-        st.number_input(
-            "5℃初期粒径", value=0.0, disabled=True, key="init_d50_5_dis"
-        )
-      else:
-        initial_d50_5 = st.number_input(
-            "5℃初期 平均粒径 (nm)",
-            min_value=0.0,
-            max_value=10000.0,
-            value=200.0,
-            step=10.0,
-            key="init_d50_5",
-        )
     with col_c2_5:
-      none_after_5 = st.checkbox("試験後粒径データなし", key="chk_after_5")
+      none_after_5 = st.checkbox("5℃試験後粒径データなし", key="chk_after_5")
       if none_after_5:
         after_d50_5 = 0.0
         st.number_input(
@@ -292,17 +318,15 @@ with tab1:
         )
 
     delta_d50_5 = (
-        after_d50_5 - initial_d50_5
-        if not none_after_5 and not none_init_5
+        after_d50_5 - initial_d50
+        if not none_after_5 and not none_init
         else 0.0
     )
 
     st.markdown("#### 🔬 5℃ レーザー解析（ピーク範囲）")
     col_l1_5, col_l2_5 = st.columns(2)
     with col_l1_5:
-      none_p1_5 = st.checkbox(
-          "5℃ 第1ピーク：データなし", key="chk_p1_5"
-      )
+      none_p1_5 = st.checkbox("5℃ 第1ピーク：データなし", key="chk_p1_5")
       if none_p1_5:
         peak1_min_5, peak1_max_5, peak1_ratio_5 = 0.0, 0.0, 0.0
         st.text("（第1ピーク: なし）")
@@ -327,9 +351,7 @@ with tab1:
             key="p1_rat_5",
         )
     with col_l2_5:
-      none_p2_5 = st.checkbox(
-          "5℃ 第2ピーク：データなし", key="chk_p2_5"
-      )
+      none_p2_5 = st.checkbox("5℃ 第2ピーク：データなし", key="chk_p2_5")
       if none_p2_5:
         peak2_min_5, peak2_max_5, peak2_ratio_5 = 0.0, 0.0, 0.0
         st.text("（第2ピーク: なし）")
@@ -354,14 +376,18 @@ with tab1:
             key="p2_rat_5",
         )
 
-    st.markdown("#### 💧 5℃ 濁度・顕微鏡写真")
-    none_turb_5 = st.checkbox("5℃濁度：データなし", key="chk_turb_5")
+    st.markdown("#### 💧 5℃ 試験後濁度・顕微鏡写真")
+    none_turb_5 = st.checkbox("5℃試験後濁度：データなし", key="chk_turb_5")
     if none_turb_5:
       turbidity_5 = 0.0
       st.text("（濁度: なし）")
     else:
       turbidity_5 = st.number_input(
-          "5℃ 濁度", value=1.0000, step=0.0001, format="%.4f", key="turb_5"
+          "5℃ 試験後濁度",
+          value=1.0000,
+          step=0.0001,
+          format="%.4f",
+          key="turb_5",
       )
 
     file_5 = st.file_uploader(
@@ -370,7 +396,7 @@ with tab1:
 
   # --- 40℃データの入力 ---
   with sub_tab_40c:
-    st.markdown("### 🔥 40℃ 試験条件・測定値")
+    st.markdown("### 🔥 40℃ 試験後データ")
     col_c1_40, col_c2_40 = st.columns(2)
     with col_c1_40:
       test_days_40 = st.number_input(
@@ -381,23 +407,8 @@ with tab1:
           step=1,
           key="sub_days_40",
       )
-      none_init_40 = st.checkbox("初期粒径データなし", key="chk_init_40")
-      if none_init_40:
-        initial_d50_40 = 0.0
-        st.number_input(
-            "40℃初期粒径", value=0.0, disabled=True, key="init_d50_40_dis"
-        )
-      else:
-        initial_d50_40 = st.number_input(
-            "40℃初期 平均粒径 (nm)",
-            min_value=0.0,
-            max_value=10000.0,
-            value=200.0,
-            step=10.0,
-            key="init_d50_40",
-        )
     with col_c2_40:
-      none_after_40 = st.checkbox("試験後粒径データなし", key="chk_after_40")
+      none_after_40 = st.checkbox("40℃試験後粒径データなし", key="chk_after_40")
       if none_after_40:
         after_d50_40 = 0.0
         st.number_input(
@@ -414,17 +425,15 @@ with tab1:
         )
 
     delta_d50_40 = (
-        after_d50_40 - initial_d50_40
-        if not none_after_40 and not none_init_40
+        after_d50_40 - initial_d50
+        if not none_after_40 and not none_init
         else 0.0
     )
 
     st.markdown("#### 🔬 40℃ レーザー解析（ピーク範囲）")
     col_l1_40, col_l2_40 = st.columns(2)
     with col_l1_40:
-      none_p1_40 = st.checkbox(
-          "40℃ 第1ピーク：データなし", key="chk_p1_40"
-      )
+      none_p1_40 = st.checkbox("40℃ 第1ピーク：データなし", key="chk_p1_40")
       if none_p1_40:
         peak1_min_40, peak1_max_40, peak1_ratio_40 = 0.0, 0.0, 0.0
         st.text("（第1ピーク: なし）")
@@ -449,9 +458,7 @@ with tab1:
             key="p1_rat_40",
         )
     with col_l2_40:
-      none_p2_40 = st.checkbox(
-          "40℃ 第2ピーク：データなし", key="chk_p2_40"
-      )
+      none_p2_40 = st.checkbox("40℃ 第2ピーク：データなし", key="chk_p2_40")
       if none_p2_40:
         peak2_min_40, peak2_max_40, peak2_ratio_40 = 0.0, 0.0, 0.0
         st.text("（第2ピーク: なし）")
@@ -476,14 +483,18 @@ with tab1:
             key="p2_rat_40",
         )
 
-    st.markdown("#### 💧 40℃ 濁度・顕微鏡写真")
-    none_turb_40 = st.checkbox("40℃濁度：データなし", key="chk_turb_40")
+    st.markdown("#### 💧 40℃ 試験後濁度・顕微鏡写真")
+    none_turb_40 = st.checkbox("40℃試験後濁度：データなし", key="chk_turb_40")
     if none_turb_40:
       turbidity_40 = 0.0
       st.text("（濁度: なし）")
     else:
       turbidity_40 = st.number_input(
-          "40℃ 濁度", value=1.0000, step=0.0001, format="%.4f", key="turb_40"
+          "40℃ 試験後濁度",
+          value=1.0000,
+          step=0.0001,
+          format="%.4f",
+          key="turb_40",
       )
 
     file_40 = st.file_uploader(
@@ -515,7 +526,6 @@ with tab1:
 
   # --- データ提出ボタン処理 ---
   if st.button("データ提出 ＆ AI同時予測を実行"):
-    # 写真が少なくともどちらか、あるいは両方必要。今回は40℃側または5℃側があればOKとする
     chosen_file = file_40 if file_40 is not None else file_5
 
     if chosen_file is not None:
@@ -539,9 +549,6 @@ with tab1:
 
       is_stable_val = 1 if stability.startswith("安定") else 0
 
-      # 5℃と40℃のデータをそれぞれ（または40℃ベースで）保存する。
-      # 今回は40℃と5℃をまとめて1つのレコード、あるいは別レコードに分けるか選択できますが、
-      # 一般的な40℃加速試験データを主軸に持ちつつ両方を記録できるように1レコードにまとめて保存します。
       new_data = pd.DataFrame([{
           "date": str(submit_date),
           "prescription_no": (
@@ -551,10 +558,12 @@ with tab1:
           "water_amount": water_amount,
           "oil_amount": oil_amount,
           "oil_ratio": oil_ratio,
-          # 40℃側のデータをメインの学習・予測指標にする
           "temperature": 40.0,
           "test_days": test_days_40,
-          "initial_d50": initial_d50_40,
+          "initial_d50": initial_d50,
+          "initial_turbidity": (
+              initial_turbidity if not none_turb_init else 0.0
+          ),
           "after_d50": after_d50_40,
           "delta_d50": delta_d50_40,
           "peak1_min": peak1_min_40,
@@ -563,8 +572,7 @@ with tab1:
           "peak2_min": peak2_min_40,
           "peak2_max": peak2_max_40,
           "peak2_ratio": peak2_ratio_40,
-          # 5℃側のデータも保存できるように追加保持
-          "initial_d50_5": initial_d50_5,
+          "initial_d50_5": initial_d50,
           "after_d50_5": after_d50_5,
           "delta_d50_5": delta_d50_5,
           "peak1_ratio_5": peak1_ratio_5,
@@ -596,9 +604,9 @@ with tab1:
       df["prescription_no"] = df["prescription_no"].astype(str)
       df["condition"] = df["condition"].astype(str)
       df.to_csv(DATA_FILE, index=False)
-      st.success("5℃・40℃の測定データを正常に保存しました！")
+      st.success("測定データを正常に保存しました！")
 
-      # --- 提出と同時にAI予測を実行（40℃データを基準） ---
+      # --- 提出と同時にAI予測を実行 ---
       st.divider()
       st.header("🤖 同時AI予測・診断結果（40℃加速試験基準）")
 
@@ -640,7 +648,7 @@ with tab1:
             "water_amount": 0.0 if none_water else water_amount,
             "oil_amount": 0.0 if none_oil else oil_amount,
             "delta_d50": delta_d50_40,
-            "initial_d50": 0.0 if none_init_40 else initial_d50_40,
+            "initial_d50": 0.0 if none_init else initial_d50,
             "after_d50": 0.0 if none_after_40 else after_d50_40,
             "peak1_min": 0.0 if none_p1_40 else peak1_min_40,
             "peak1_max": 0.0 if none_p1_40 else peak1_max_40,
@@ -725,7 +733,7 @@ with tab1:
             )
           if not none_p2_40 and peak2_ratio_40 > 3.0:
             advice_list.append("・**40℃第2ピーク比率が高めです**。")
-          if not none_after_40 and not none_init_40 and delta_d50_40 > 30:
+          if not none_after_40 and not none_init and delta_d50_40 > 30:
             advice_list.append("・**40℃粒径変動スピードが大きい**です。")
           if not advice_list:
             advice_list.append("・処方の再検討をおすすめします。")
@@ -974,21 +982,21 @@ with tab3:
                 o_amt = row.get("oil_amount", "-")
                 o_rat = row.get("oil_ratio", 0.0)
                 d50_init = row.get("initial_d50", "-")
+                turb_init = row.get("initial_turbidity", "-")
                 d50_after = row.get("after_d50", "-")
                 d_d50 = row.get("delta_d50", 0)
-                p2_rat = row.get("peak2_ratio", 5.0)
 
-                d50_init_5 = row.get("initial_d50_5", "-")
                 d50_after_5 = row.get("after_d50_5", "-")
 
                 st.write(
                     f"📅 **提出日**: {row.get('date', '不明')}  \n"
                     f"💧 **処方組成**: 水層 {w_amt}g / 油層 {o_amt}g （油分率:"
                     f" {float(o_rat):.1f}%）  \n"
-                    f"🔥 **40℃試験**: 初期 {d50_init}nm → 試験後"
-                    f" {d50_after}nm (Δ: {float(d_d50):+.1f}nm)  \n"
-                    f"❄️ **5℃試験**: 初期 {d50_init_5}nm → 試験後"
-                    f" {d50_after_5}nm  \n"
+                    f"🔬 **共通初期値**: 初期粒径 {d50_init}nm / 虐待前濁度"
+                    f" {turb_init}  \n"
+                    f"🔥 **40℃試験後**: {d50_after}nm (Δ: {float(d_d50):+.1f}nm)"
+                    f"  \n"
+                    f"❄️ **5℃試験後**: {d50_after_5}nm  \n"
                     f"⚖️ **判定**: {row.get('stability_text', '')}"
                 )
                 if "不安定" in str(row.get("stability_text", "")):
@@ -1039,28 +1047,31 @@ with tab3:
                       key=f"e_oil_{index}",
                   )
 
-                  st.markdown("#### 🔥 40℃ 編集パラメータ")
+                  st.markdown("#### 🔬 共通初期値の編集")
                   edit_init = st.number_input(
-                      "40℃初期平均粒径 (nm)",
+                      "初期平均粒径 (nm)",
                       value=float(row.get("initial_d50", 200.0)),
                       key=f"e_init_{index}",
                   )
+                  edit_turb_init = st.number_input(
+                      "虐待前（初期）濁度",
+                      value=float(
+                          row.get("initial_turbidity", 1.0)
+                          if pd.notnull(row.get("initial_turbidity"))
+                          else 1.0
+                      ),
+                      format="%.4f",
+                      key=f"e_turbinit_{index}",
+                  )
+
+                  st.markdown("#### 🔥 40℃ 試験後編集")
                   edit_after = st.number_input(
                       "40℃試験後平均粒径 (nm)",
                       value=float(row.get("after_d50", 220.0)),
                       key=f"e_after_{index}",
                   )
 
-                  st.markdown("#### ❄️ 5℃ 編集パラメータ")
-                  edit_init_5 = st.number_input(
-                      "5℃初期平均粒径 (nm)",
-                      value=float(
-                          row.get("initial_d50_5", 200.0)
-                          if pd.notnull(row.get("initial_d50_5"))
-                          else 200.0
-                      ),
-                      key=f"e_init5_{index}",
-                  )
+                  st.markdown("#### ❄️ 5℃ 試験後編集")
                   edit_after_5 = st.number_input(
                       "5℃試験後平均粒径 (nm)",
                       value=float(
@@ -1111,9 +1122,9 @@ with tab3:
                     df.loc[index, "oil_amount"] = float(edit_oil)
                     df.loc[index, "oil_ratio"] = float(new_o_rat)
                     df.loc[index, "initial_d50"] = float(edit_init)
+                    df.loc[index, "initial_turbidity"] = float(edit_turb_init)
                     df.loc[index, "after_d50"] = float(edit_after)
                     df.loc[index, "delta_d50"] = float(new_delta)
-                    df.loc[index, "initial_d50_5"] = float(edit_init_5)
                     df.loc[index, "after_d50_5"] = float(edit_after_5)
                     df.loc[index, "condition"] = str(edit_cond)
                     df.loc[index, "stability_text"] = edit_stability
