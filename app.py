@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（初期値共通化・タブ別入力対応）"
+    "🧪 乳化安定性 予測AIアシスタント（入力レイアウト最適化版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>製造直後の初期粒径と初期濁度を共通入力し、5℃・40℃の試験後データをタブでそれぞれ管理できます。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>各温度タブ内の「濁度」をピーク上に配置し、顕微鏡写真を一番下に整理しました。</p>",
     unsafe_allow_html=True,
 )
 
@@ -280,7 +280,7 @@ with tab1:
   st.divider()
   st.subheader("🌡️ 温度別（5℃ / 40℃）の試験後データ入力タブ")
   st.markdown(
-      "それぞれの温度における試験後粒径・ピーク範囲・濁度・顕微鏡写真を"
+      "それぞれの温度における試験後粒径・濁度・ピーク範囲・顕微鏡写真を"
       "入力してください。"
   )
 
@@ -322,6 +322,21 @@ with tab1:
         if not none_after_5 and not none_init
         else 0.0
     )
+
+    # 濁度をピークの上に配置
+    st.markdown("#### 💧 5℃ 試験後濁度")
+    none_turb_5 = st.checkbox("5℃試験後濁度：データなし", key="chk_turb_5")
+    if none_turb_5:
+      turbidity_5 = 0.0
+      st.text("（濁度: なし）")
+    else:
+      turbidity_5 = st.number_input(
+          "5℃ 試験後濁度",
+          value=1.0000,
+          step=0.0001,
+          format="%.4f",
+          key="turb_5",
+      )
 
     st.markdown("#### 🔬 5℃ レーザー解析（ピーク範囲）")
     col_l1_5, col_l2_5 = st.columns(2)
@@ -376,22 +391,12 @@ with tab1:
             key="p2_rat_5",
         )
 
-    st.markdown("#### 💧 5℃ 試験後濁度・顕微鏡写真")
-    none_turb_5 = st.checkbox("5℃試験後濁度：データなし", key="chk_turb_5")
-    if none_turb_5:
-      turbidity_5 = 0.0
-      st.text("（濁度: なし）")
-    else:
-      turbidity_5 = st.number_input(
-          "5℃ 試験後濁度",
-          value=1.0000,
-          step=0.0001,
-          format="%.4f",
-          key="turb_5",
-      )
-
+    # 顕微鏡写真はそのまま一番下
+    st.markdown("#### 📸 5℃条件の顕微鏡写真")
     file_5 = st.file_uploader(
-        "📸 5℃条件の顕微鏡写真", type=["png", "jpg", "jpeg"], key="file_5"
+        "顕微鏡写真ファイルをアップロード",
+        type=["png", "jpg", "jpeg"],
+        key="file_5",
     )
 
   # --- 40℃データの入力 ---
@@ -429,6 +434,21 @@ with tab1:
         if not none_after_40 and not none_init
         else 0.0
     )
+
+    # 濁度をピークの上に配置
+    st.markdown("#### 💧 40℃ 試験後濁度")
+    none_turb_40 = st.checkbox("40℃試験後濁度：データなし", key="chk_turb_40")
+    if none_turb_40:
+      turbidity_40 = 0.0
+      st.text("（濁度: なし）")
+    else:
+      turbidity_40 = st.number_input(
+          "40℃ 試験後濁度",
+          value=1.0000,
+          step=0.0001,
+          format="%.4f",
+          key="turb_40",
+      )
 
     st.markdown("#### 🔬 40℃ レーザー解析（ピーク範囲）")
     col_l1_40, col_l2_40 = st.columns(2)
@@ -483,22 +503,12 @@ with tab1:
             key="p2_rat_40",
         )
 
-    st.markdown("#### 💧 40℃ 試験後濁度・顕微鏡写真")
-    none_turb_40 = st.checkbox("40℃試験後濁度：データなし", key="chk_turb_40")
-    if none_turb_40:
-      turbidity_40 = 0.0
-      st.text("（濁度: なし）")
-    else:
-      turbidity_40 = st.number_input(
-          "40℃ 試験後濁度",
-          value=1.0000,
-          step=0.0001,
-          format="%.4f",
-          key="turb_40",
-      )
-
+    # 顕微鏡写真はそのまま一番下
+    st.markdown("#### 📸 40℃条件の顕微鏡写真")
     file_40 = st.file_uploader(
-        "📸 40℃条件の顕微鏡写真", type=["png", "jpg", "jpeg"], key="file_40"
+        "顕微鏡写真ファイルをアップロード",
+        type=["png", "jpg", "jpeg"],
+        key="file_40",
     )
 
   st.divider()
