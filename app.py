@@ -7,6 +7,8 @@ from PIL import Image
 import sklearn
 from sklearn.ensemble import RandomForestClassifier
 import streamlit as st
+import plotly.graph_objects as go
+from streamlit_plotly_events import plotly_events
 
 # データの保存先CSV
 DATA_FILE = "dataset.csv"
@@ -68,11 +70,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title(
-    "🧪 乳化安定性 予測AIアシスタント（グラフ面積計算ツール埋め込み版）"
-)
+st.title("🧪 乳化安定性 予測AIアシスタント（グラフクリック面積計算対応版）")
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>データ提出時の各温度タブ内にCSVグラフの面積計算ツールを搭載しています。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>データ提出時の各温度タブ内にインタラクティブなグラフ面積計算ツールを搭載しています。</p>",
     unsafe_allow_html=True,
 )
 
@@ -157,21 +157,19 @@ def extract_advanced_image_features(image_file):
     return 0.0, 0.0, 0.0, 0.0, 0.0
 
 
-# --- グラフ解析・面積計算を描画・処理するヘルパー関数 ---
-import matplotlib.pyplot as plt
-
-
-def render_graph_area_calculator(key_suffix):
+# --- Plotlyを用いたインタラクティブグラフ＆クリック面積計算ウィジェット ---
+def render_interactive_graph_area_calculator(key_suffix):
   st.markdown(
-      "📉 **CSVグラフ 面積計算ツール**（CSVファイルを選択して区間を指定できます）"
+      "📉 **CSVグラフ ポイント抽出＆面積計算ツール**"
+      "（グラフ上の点をクリックすると値が自動入力されます）"
   )
 
-  # セッションステートの初期化
   df_key = f"calc_df_{key_suffix}"
   x_key = f"calc_x_{key_suffix}"
   y_key = f"calc_y_{key_suffix}"
   asc_key = f"calc_asc_{key_suffix}"
   desc_key = f"calc_desc_{key_suffix}"
+  target_key = f"calc_target_{key_suffix}"
   area_key = f"calc_area_{key_suffix}"
 
   if df_key not in st.session_state:
@@ -180,6 +178,7 @@ def render_graph_area_calculator(key_suffix):
     st.session_state[y_key] = None
     st.session_state[asc_key] = None
     st.session_state[desc_key] = None
+    st.session_state[target_key] = "ascent"
     st.session_state[area_key] = 0.0
 
   uploaded_csv = st.file_uploader(
@@ -192,8 +191,21 @@ def render_graph_area_calculator(key_suffix):
         st.session_state[df_key] = temp_df
         st.session_state[x_key] = temp_df.iloc[:, 0].values
         st.session_state[y_key] = temp_df.iloc[:, 1].values
+        st.session_state[asc_key] = None
+        st.session_state[desc_key] = None
     except Exception as e:
       st.error(f"CSV読み込みエラー: {e}")
+
+  # 入力モード切替ラジオ
+  target_mode = st.radio(
+      "グラフをクリックしたときに入力する項目を選択:",
+      ["上りに入力", "下がりに入力"],
+      key=f"radio_target_{key_suffix}",
+      horizontal=True,
+  )
+  st.session_state[target_key] = (
+      "ascent" if target_mode == "上りに入力" else "descent"
+  )
 
   col_input1, col_input2, col_input3 = st.columns(3)
   with col_input1:
@@ -206,9 +218,8 @@ def render_graph_area_calculator(key_suffix):
         ),
         key=f"input_asc_{key_suffix}",
     )
-    st.session_state[asc_key] = (
-        ascent_val if ascent_val != 0.0 or st.session_state[asc_key] else None
-    )
+    if ascent_val != 0.0:
+      st.session_state[asc_key] = ascent_val
   with col_input2:
     descent_val = st.number_input(
         "下がり始め (X)",
@@ -219,13 +230,9 @@ def render_graph_area_calculator(key_suffix):
         ),
         key=f"input_desc_{key_suffix}",
     )
-    st.session_state[desc_key] = (
-        descent_val
-        if descent_val != 0.0 or st.session_state[desc_key]
-        else None
-    )
+    if descent_val != 0.0:
+      st.session_state[desc_key] = descent_val
   with col_input3:
-    # 面積の計算・表示
     if (
         st.session_state[asc_key] is not None
         and st.session_state[desc_key] is not None
@@ -254,62 +261,90 @@ def render_graph_area_calculator(key_suffix):
     else:
       st.metric(label="計算された面積", value="-")
 
-  # グラフ描画
-  fig, ax = plt.subplots(figsize=(8, 4))
+  # Plotlyを使ったインタラクティブグラフの描画
   if st.session_state[x_key] is not None and st.session_state[y_key] is not None:
-    ax.plot(
-        st.session_state[x_key],
-        st.session_state[y_key],
-        marker="o",
-        linestyle="-",
-        color="royalblue",
-        markersize=3,
-        label="Data",
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=st.session_state[x_key],
+            y=st.session_state[y_key],
+            mode="lines+markers",
+            name="Data",
+            line=dict(color="royalblue"),
+            marker=dict(size=5),
+        )
     )
+
+    # 強調表示（上りはじめ・下がり始め）
     if st.session_state[asc_key] is not None:
       idx1 = np.argmin(np.abs(st.session_state[x_key] - st.session_state[asc_key]))
-      ax.plot(
-          st.session_state[x_key][idx1],
-          st.session_state[y_key][idx1],
-          marker="o",
-          color="red",
-          markersize=8,
-          label="上りはじめ",
+      fig.add_trace(
+          go.Scatter(
+              x=[st.session_state[x_key][idx1]],
+              y=[st.session_state[y_key][idx1]],
+              mode="markers",
+              marker=dict(color="red", size=12),
+              name="上りはじめ",
+          )
       )
     if st.session_state[desc_key] is not None:
       idx2 = np.argmin(
           np.abs(st.session_state[x_key] - st.session_state[desc_key])
       )
-      ax.plot(
-          st.session_state[x_key][idx2],
-          st.session_state[y_key][idx2],
-          marker="o",
-          color="darkorange",
-          markersize=8,
-          label="下がり始め",
+      fig.add_trace(
+          go.Scatter(
+              x=[st.session_state[x_key][idx2]],
+              y=[st.session_state[y_key][idx2]],
+              mode="markers",
+              marker=dict(color="darkorange", size=12),
+              name="下がり始め",
+          )
       )
-    if (
-        st.session_state[asc_key] is not None
-        and st.session_state[desc_key] is not None
-    ):
-      x_min = min(st.session_state[asc_key], st.session_state[desc_key])
-      x_max = max(st.session_state[asc_key], st.session_state[desc_key])
-      mask = (st.session_state[x_key] >= x_min) & (
-          st.session_state[x_key] <= x_max
-      )
-      if np.sum(mask) >= 2:
-        ax.fill_between(
-            st.session_state[x_key][mask],
-            st.session_state[y_key][mask],
-            color="orange",
-            alpha=0.3,
-            label="面積範囲",
-        )
-    ax.grid(True, linestyle="--", alpha=0.6)
-    ax.legend()
+
+    fig.update_layout(
+        title="グラフ（クリックでポイント選択）",
+        xaxis_title=(
+            st.session_state[df_key].columns[0]
+            if st.session_state[df_key] is not None
+            else "X軸"
+        ),
+        yaxis_title=(
+            st.session_state[df_key].columns[1]
+            if st.session_state[df_key] is not None
+            else "Y軸"
+        ),
+        height=400,
+        margin=dict(l=20, r=20, t=40, b=20),
+        clickmode="event+select",
+    )
+
+    # plotly-eventsを使ってクリックされた座標を取得
+    selected_points = plotly_events(
+        fig,
+        click_event=True,
+        select_event=False,
+        hover_event=False,
+        key=f"plotly_evt_{key_suffix}",
+    )
+
+    if selected_points:
+      clicked_x = selected_points[0]["x"]
+      # 最も近いデータポイントのX座標を特定
+      distances = np.abs(st.session_state[x_key] - clicked_x)
+      nearest_idx = np.argmin(distances)
+      nearest_x = st.session_state[x_key][nearest_idx]
+
+      if st.session_state[target_key] == "ascent":
+        st.session_state[asc_key] = nearest_x
+        # 自動で次は「下がり」に切り替える
+        st.session_state[f"radio_target_{key_suffix}"] = "下がりに入力"
+      else:
+        st.session_state[desc_key] = nearest_x
+      st.rerun()
+
   else:
-    ax.set_title("CSVファイルをアップロードしてください")
-  st.pyplot(fig)
+    st.info("CSVファイルをアップロードしてください。")
+
   return st.session_state[area_key]
 
 
@@ -497,8 +532,8 @@ with tab1:
       )
 
     st.divider()
-    # 5℃用 面積計算ツールの埋め込み
-    calculated_area_5 = render_graph_area_calculator("5c")
+    # 5℃用 インタラクティブグラフ計算ツールの埋め込み
+    calculated_area_5 = render_interactive_graph_area_calculator("5c")
     st.divider()
 
     st.markdown("#### 🔬 5℃ レーザー解析（ピーク範囲）")
@@ -612,8 +647,8 @@ with tab1:
       )
 
     st.divider()
-    # 40℃用 面積計算ツールの埋め込み
-    calculated_area_40 = render_graph_area_calculator("40c")
+    # 40℃用 インタラクティブグラフ計算ツールの埋め込み
+    calculated_area_40 = render_interactive_graph_area_calculator("40c")
     st.divider()
 
     st.markdown("#### 🔬 40℃ レーザー解析（ピーク範囲）")
