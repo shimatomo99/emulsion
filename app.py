@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（ピーク面積比・破綻閾値解析対応版）"
+    "🧪 乳化安定性 予測AIアシスタント（5℃・40℃ 2枚写真対応版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>第1/第2ピーク面積比をAI学習・評価し、安定性の限界閾値を自動分析します。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>処方グループ別まとめで5℃と40℃の写真をそれぞれ2枚並べて確認できます。</p>",
     unsafe_allow_html=True,
 )
 
@@ -400,7 +400,7 @@ with tab1:
 
     st.markdown("#### 📸 5℃条件の顕微鏡写真")
     file_5 = st.file_uploader(
-        "顕微鏡写真ファイルをアップロード",
+        "5℃ 顕微鏡写真ファイルをアップロード",
         type=["png", "jpg", "jpeg"],
         key="file_5",
     )
@@ -519,7 +519,7 @@ with tab1:
 
     st.markdown("#### 📸 40℃条件の顕微鏡写真")
     file_40 = st.file_uploader(
-        "顕微鏡写真ファイルをアップロード",
+        "40℃ 顕微鏡写真ファイルをアップロード",
         type=["png", "jpg", "jpeg"],
         key="file_40",
     )
@@ -549,250 +549,227 @@ with tab1:
 
   # --- データ提出ボタン処理 ---
   if st.button("データ提出 ＆ AI同時予測を実行"):
+    folder_map = {
+        "アラビアガム": "data/arabic_gum",
+        "ポリグリ": "data/polygly",
+        "キラヤ": "data/quillaja",
+    }
+    save_dir = folder_map[emulsifier]
+    os.makedirs(save_dir, exist_ok=True)
+
+    image_path_40 = ""
+    if file_40 is not None:
+      image_path_40 = os.path.join(save_dir, "40c_" + file_40.name)
+      with open(image_path_40, "wb") as f:
+        f.write(file_40.getvalue())
+      file_40.seek(0)
+
+    image_path_5 = ""
+    if file_5 is not None:
+      image_path_5 = os.path.join(save_dir, "5c_" + file_5.name)
+      with open(image_path_5, "wb") as f:
+        f.write(file_5.getvalue())
+      file_5.seek(0)
+
     chosen_file = file_40 if file_40 is not None else file_5
+    p_count, m_area, m_circ, m_bright, s_bright = (
+        extract_advanced_image_features(chosen_file)
+        if chosen_file is not None
+        else (0.0, 0.0, 0.0, 0.0, 0.0)
+    )
 
-    if chosen_file is not None:
-      folder_map = {
-          "アラビアガム": "data/arabic_gum",
-          "ポリグリ": "data/polygly",
-          "キラヤ": "data/quillaja",
-      }
-      save_dir = folder_map[emulsifier]
-      os.makedirs(save_dir, exist_ok=True)
+    is_stable_val = 1 if stability.startswith("安定") else 0
 
-      image_path = os.path.join(save_dir, chosen_file.name)
-      img_bytes_for_save = chosen_file.getvalue()
-      with open(image_path, "wb") as f:
-        f.write(img_bytes_for_save)
+    new_data = pd.DataFrame([{
+        "date": str(submit_date),
+        "prescription_no": (
+            str(prescription_no) if prescription_no else "未設定"
+        ),
+        "emulsifier": emulsifier,
+        "water_amount": water_amount,
+        "oil_amount": oil_amount,
+        "oil_ratio": oil_ratio,
+        "temperature": 40.0,
+        "test_days": test_days_40,
+        "initial_d50": initial_d50,
+        "initial_turbidity": initial_turbidity if not none_turb_init else 0.0,
+        "after_d50": after_d50_40,
+        "delta_d50": delta_d50_40,
+        "peak1_start": peak1_start_40,
+        "peak1_end": peak1_end_40,
+        "peak1_area": peak1_area_40,
+        "peak2_start": peak2_start_40,
+        "peak2_end": peak2_end_40,
+        "peak2_area": peak2_area_40,
+        "peak_ratio_40": peak_ratio_40,
+        "peak1_start_5": peak1_start_5,
+        "peak1_end_5": peak1_end_5,
+        "peak1_area_5": peak1_area_5,
+        "peak2_start_5": peak2_start_5,
+        "peak2_end_5": peak2_end_5,
+        "peak2_area_5": peak2_area_5,
+        "peak_ratio_5": peak_ratio_5,
+        "turbidity_5": turbidity_5,
+        "after_d50_5": after_d50_5,
+        "delta_d50_5": delta_d50_5,
+        "particle_size": after_d50_40,
+        "turbidity": turbidity_40,
+        "condition": str(condition_memo) if condition_memo else "",
+        "stability_text": stability,
+        "is_stable": is_stable_val,
+        "days": unstable_days,
+        "image_path": image_path_40,
+        "image_path_5": image_path_5,
+        "particle_count": p_count,
+        "mean_area": m_area,
+        "circularity": m_circ,
+        "img_mean": m_bright,
+        "img_std": s_bright,
+    }])
 
-      chosen_file.seek(0)
-      p_count, m_area, m_circ, m_bright, s_bright = (
-          extract_advanced_image_features(chosen_file)
+    if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 0:
+      try:
+        df = pd.read_csv(DATA_FILE)
+        df = pd.concat([df, new_data], ignore_index=True)
+      except Exception:
+        df = new_data
+    else:
+      df = new_data
+
+    df["prescription_no"] = df["prescription_no"].astype(str)
+    df["condition"] = df["condition"].astype(str)
+    df.to_csv(DATA_FILE, index=False)
+    st.success("測定データを正常に保存しました！")
+
+    # --- 提出と同時にAI予測を実行 ---
+    st.divider()
+    st.header("🤖 同時AI予測・診断結果（ピーク面積比解析基準）")
+
+    train_df = df[df["emulsifier"] == emulsifier]
+    if len(train_df) < 2:
+      train_df = df
+
+    if len(train_df) < 2:
+      st.info(
+          "※学習データが2件未満のため、AI予測を行うにはさらにデータを蓄積する"
+          "必要があります。"
       )
+    else:
+      base_feature_cols = [
+          "oil_ratio",
+          "water_amount",
+          "oil_amount",
+          "delta_d50",
+          "initial_d50",
+          "after_d50",
+          "peak_ratio_40",
+          "particle_count",
+          "mean_area",
+          "circularity",
+          "img_mean",
+          "img_std",
+          "temperature",
+          "test_days",
+          "turbidity",
+      ]
 
-      is_stable_val = 1 if stability.startswith("安定") else 0
-
-      new_data = pd.DataFrame([{
-          "date": str(submit_date),
-          "prescription_no": (
-              str(prescription_no) if prescription_no else "未設定"
-          ),
-          "emulsifier": emulsifier,
-          "water_amount": water_amount,
-          "oil_amount": oil_amount,
+      val_map = {
           "oil_ratio": oil_ratio,
+          "water_amount": 0.0 if none_water else water_amount,
+          "oil_amount": 0.0 if none_oil else oil_amount,
+          "delta_d50": delta_d50_40,
+          "initial_d50": 0.0 if none_init else initial_d50,
+          "after_d50": 0.0 if none_after_40 else after_d50_40,
+          "peak_ratio_40": peak_ratio_40,
           "temperature": 40.0,
           "test_days": test_days_40,
-          "initial_d50": initial_d50,
-          "initial_turbidity": (
-              initial_turbidity if not none_turb_init else 0.0
-          ),
-          "after_d50": after_d50_40,
-          "delta_d50": delta_d50_40,
-          "peak1_start": peak1_start_40,
-          "peak1_end": peak1_end_40,
-          "peak1_area": peak1_area_40,
-          "peak2_start": peak2_start_40,
-          "peak2_end": peak2_end_40,
-          "peak2_area": peak2_area_40,
-          "peak_ratio_40": peak_ratio_40,
-          "peak1_start_5": peak1_start_5,
-          "peak1_end_5": peak1_end_5,
-          "peak1_area_5": peak1_area_5,
-          "peak2_start_5": peak2_start_5,
-          "peak2_end_5": peak2_end_5,
-          "peak2_area_5": peak2_area_5,
-          "peak_ratio_5": peak_ratio_5,
-          "turbidity_5": turbidity_5,
-          "after_d50_5": after_d50_5,
-          "delta_d50_5": delta_d50_5,
-          "particle_size": after_d50_40,
-          "turbidity": turbidity_40,
-          "condition": str(condition_memo) if condition_memo else "",
-          "stability_text": stability,
-          "is_stable": is_stable_val,
-          "days": unstable_days,
-          "image_path": image_path,
+          "turbidity": 0.0 if none_turb_40 else turbidity_40,
           "particle_count": p_count,
           "mean_area": m_area,
           "circularity": m_circ,
           "img_mean": m_bright,
           "img_std": s_bright,
-      }])
+      }
 
-      if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 0:
-        try:
-          df = pd.read_csv(DATA_FILE)
-          df = pd.concat([df, new_data], ignore_index=True)
-        except Exception:
-          df = new_data
-      else:
-        df = new_data
-
-      df["prescription_no"] = df["prescription_no"].astype(str)
-      df["condition"] = df["condition"].astype(str)
-      df.to_csv(DATA_FILE, index=False)
-      st.success("測定データを正常に保存しました！")
-
-      # --- 提出と同時にAI予測を実行（ピーク面積比を最重要特徴量に含む） ---
-      st.divider()
-      st.header("🤖 同時AI予測・診断結果（ピーク面積比解析基準）")
-
-      train_df = df[df["emulsifier"] == emulsifier]
-      if len(train_df) < 2:
-        train_df = df
-
-      if len(train_df) < 2:
-        st.info(
-            "※学習データが2件未満のため、AI予測を行うにはさらにデータを蓄積する"
-            "必要があります。"
-        )
-      else:
-        # 学習特徴量に peak_ratio_40 を含める
-        base_feature_cols = [
-            "oil_ratio",
-            "water_amount",
-            "oil_amount",
-            "delta_d50",
-            "initial_d50",
-            "after_d50",
-            "peak_ratio_40",
-            "particle_count",
-            "mean_area",
-            "circularity",
-            "img_mean",
-            "img_std",
-            "temperature",
-            "test_days",
-            "turbidity",
-        ]
-
-        val_map = {
-            "oil_ratio": oil_ratio,
-            "water_amount": 0.0 if none_water else water_amount,
-            "oil_amount": 0.0 if none_oil else oil_amount,
-            "delta_d50": delta_d50_40,
-            "initial_d50": 0.0 if none_init else initial_d50,
-            "after_d50": 0.0 if none_after_40 else after_d50_40,
-            "peak_ratio_40": peak_ratio_40,
-            "temperature": 40.0,
-            "test_days": test_days_40,
-            "turbidity": 0.0 if none_turb_40 else turbidity_40,
-            "particle_count": p_count,
-            "mean_area": m_area,
-            "circularity": m_circ,
-            "img_mean": m_bright,
-            "img_std": s_bright,
-        }
-
-        active_feature_cols = []
-        for col in base_feature_cols:
-          if col in train_df.columns:
-            if val_map[col] != 0.0 or col in [
-                "temperature",
-                "test_days",
-                "oil_ratio",
-                "peak_ratio_40",
-            ]:
-              active_feature_cols.append(col)
-
-        if len(active_feature_cols) < 2:
-          active_feature_cols = [
+      active_feature_cols = []
+      for col in base_feature_cols:
+        if col in train_df.columns:
+          if val_map[col] != 0.0 or col in [
               "temperature",
               "test_days",
               "oil_ratio",
               "peak_ratio_40",
-          ]
+          ]:
+            active_feature_cols.append(col)
 
-        for col in active_feature_cols:
-          if col not in train_df.columns:
-            train_df[col] = 0.0
+      if len(active_feature_cols) < 2:
+        active_feature_cols = [
+            "temperature",
+            "test_days",
+            "oil_ratio",
+            "peak_ratio_40",
+        ]
 
-        train_clean = train_df.dropna(subset=active_feature_cols + ["is_stable"])
+      for col in active_feature_cols:
+        if col not in train_df.columns:
+          train_df[col] = 0.0
 
-        if len(train_clean) < 2:
-          train_clean = train_df.dropna(subset=["is_stable"])
-          active_feature_cols = [
-              c
-              for c in ["temperature", "test_days", "oil_ratio", "peak_ratio_40"]
-              if c in train_clean.columns
-          ]
+      train_clean = train_df.dropna(subset=active_feature_cols + ["is_stable"])
 
-        X = train_clean[active_feature_cols]
-        y_class = train_clean["is_stable"]
+      if len(train_clean) < 2:
+        train_clean = train_df.dropna(subset=["is_stable"])
+        active_feature_cols = [
+            c
+            for c in ["temperature", "test_days", "oil_ratio", "peak_ratio_40"]
+            if c in train_clean.columns
+        ]
 
-        model = RandomForestClassifier(n_estimators=10, random_state=42)
-        model.fit(X, y_class)
+      X = train_clean[active_feature_cols]
+      y_class = train_clean["is_stable"]
 
-        X_pred = np.array([[val_map[col] for col in active_feature_cols]])
+      model = RandomForestClassifier(n_estimators=10, random_state=42)
+      model.fit(X, y_class)
 
-        prediction = model.predict(X_pred)[0]
-        proba = model.predict_proba(X_pred)[0]
-        confidence = max(proba) * 100
+      X_pred = np.array([[val_map[col] for col in active_feature_cols]])
 
-        # --- 過去の不安定データから「限界となるピーク面積比の閾値」を自動分析 ---
-        unstable_subset = train_clean[train_clean["is_stable"] == 0]
-        stable_subset = train_clean[train_clean["is_stable"] == 1]
+      prediction = model.predict(X_pred)[0]
+      proba = model.predict_proba(X_pred)[0]
+      confidence = max(proba) * 100
 
-        avg_unstable_days = (
-            int(unstable_subset["days"].mean())
-            if len(unstable_subset) > 0 and "days" in unstable_subset
-            else 30
+      unstable_subset = train_clean[train_clean["is_stable"] == 0]
+      avg_unstable_days = (
+          int(unstable_subset["days"].mean())
+          if len(unstable_subset) > 0 and "days" in unstable_subset
+          else 30
+      )
+      critical_ratio_threshold = (
+          float(unstable_subset["peak_ratio_40"].mean())
+          if len(unstable_subset) > 0 and "peak_ratio_40" in unstable_subset
+          else 5.0
+      )
+
+      if prediction == 1:
+        st.success(f"判定：**9か月間安定**（予測確信度: {confidence:.1f}%）")
+        st.balloons()
+      else:
+        st.error(
+            f"🚨 【リスクアラート発令】 9か月以内に不安定化・分離の恐れあり"
+            f"（予測確信度: {confidence:.1f}%）"
+        )
+        st.warning(
+            f"⚠️ **寿命予測の注意喚起**: 有効な測定データ傾向から推測して、約"
+            f" **{avg_unstable_days} 日前後** で破綻する恐れがあります。"
         )
 
-        # 不安定になったサンプルでのピーク面積比の平均値（あるいは境界値）を算出
-        critical_ratio_threshold = (
-            float(unstable_subset["peak_ratio_40"].mean())
-            if len(unstable_subset) > 0 and "peak_ratio_40" in unstable_subset
-            else 5.0
-        )
-
-        if prediction == 1:
-          st.success(f"判定：**9か月間安定**（予測確信度: {confidence:.1f}%）")
-          st.balloons()
-        else:
-          st.error(
-              f"🚨 【リスクアラート発令】 9か月以内に不安定化・分離の恐れあり"
-              f"（予測確信度: {confidence:.1f}%）"
-          )
-          st.warning(
-              f"⚠️ **寿命予測の注意喚起**: 有効な測定データ傾向から推測して、約"
-              f" **{avg_unstable_days} 日前後** で破綻する恐れがあります。"
-          )
-
-        # --- ピーク面積比に関するAIからの詳細アドバイス ---
-        st.info("🤖 **ピーク面積比に基づくAI分析・限界警告**")
-        st.write(
-            f"・蓄積された不安定データの分析から、第1/第2ピーク面積比が"
-            f" **{critical_ratio_threshold:.2f} 以下**"
-            "（第二ピークの割合が相対的に増大）になると、乳化安定性が崩れるリスクが高まる傾向があります。"
-        )
-        st.write(
-            f"・今回の入力されたピーク面積比: **{peak_ratio_40:.4f}**"
-            f" （健全な安定データの平均比率と比較してください）"
-        )
-
-        advice_list = []
-        if peak_ratio_40 < critical_ratio_threshold:
-          advice_list.append(
-              "・**第二ピークが大きくなりすぎています（面積比低下）**：合一・凝集が進んでいる恐れがあります。"
-          )
-        if not none_oil and oil_ratio > 40.0:
-          advice_list.append(
-              "・**油分率が高めの処方です**：乳化剤の増量をご検討ください。"
-          )
-        if not none_after_40 and not none_init and delta_d50_40 > 30:
-          advice_list.append("・**40℃粒径変動スピードが大きい**です。")
-
-        if not advice_list:
-          advice_list.append(
-              "・現在のピーク比は許容範囲内ですが、経時変化にご注意ください。"
-          )
-
-        for advice in advice_list:
-          st.write(advice)
-    else:
-      st.warning("顕微鏡写真を少なくとも1枚アップロードしてください。")
+      st.info("🤖 **ピーク面積比に基づくAI分析・限界警告**")
+      st.write(
+          f"・蓄積された不安定データの分析から、第1/第2ピーク面積比が"
+          f" **{critical_ratio_threshold:.2f} 以下**"
+          "になると、乳化安定性が崩れるリスクが高まる傾向があります。"
+      )
+      st.write(
+          f"・今回の入力されたピーク面積比: **{peak_ratio_40:.4f}**"
+      )
 
 # --- 2. 個別予測・確認タブ ---
 with tab2:
@@ -831,7 +808,11 @@ with tab2:
   )
   pred_delta_d50 = pred_after_d50 - pred_init_d50
   pred_peak_ratio = st.number_input(
-      "予測時の第1/第2ピーク面積比", value=10.0, step=0.0001, format="%.4f", key="pred_peak_ratio"
+      "予測時の第1/第2ピーク面積比",
+      value=10.0,
+      step=0.0001,
+      format="%.4f",
+      key="pred_peak_ratio",
   )
 
   pred_file = st.file_uploader(
@@ -1014,24 +995,35 @@ with tab3:
         ):
           for index, row in group_df.iterrows():
             with st.container(border=True):
-              col1, col2, col3 = st.columns([1.2, 2.6, 1.0])
+              # --- 写真を2つ並べて表示するカラム構成 ---
+              col_img1, col_img2, col_txt, col_btn = st.columns([1, 1, 2.2, 0.9])
 
-              with col1:
-                img_path = str(row.get("image_path", ""))
-                if os.path.exists(img_path):
-                  image = Image.open(img_path)
+              with col_img1:
+                img_path_5 = str(row.get("image_path_5", ""))
+                if os.path.exists(img_path_5):
                   st.image(
-                      image,
-                      caption=f"提出日: {row.get('date', '不明')}",
-                      width=140,
+                      Image.open(img_path_5),
+                      caption=f"❄️ 5℃ ({row.get('date', '')})",
+                      width=110,
                   )
                 else:
-                  st.write("（写真なし）")
+                  st.write("（5℃写真なし）")
 
-              with col2:
+              with col_img2:
+                img_path_40 = str(row.get("image_path", ""))
+                if os.path.exists(img_path_40):
+                  st.image(
+                      Image.open(img_path_40),
+                      caption=f"🔥 40℃ ({row.get('date', '')})",
+                      width=110,
+                  )
+                else:
+                  st.write("（40℃写真なし）")
+
+              with col_txt:
                 pres_title = str(row.get("prescription_no", ""))
                 emuls_name = str(row.get("emulsifier", "不明"))
-                st.markdown(f"### 🧪 {pres_title} | 乳化剤: {emuls_name}")
+                st.markdown(f"### 🧪 {pres_title} | {emuls_name}")
 
                 w_amt = row.get("water_amount", "-")
                 o_amt = row.get("oil_amount", "-")
@@ -1044,16 +1036,14 @@ with tab3:
                 )
 
                 st.write(
-                    f"📅 **提出日**: {row.get('date', '不明')}  \n"
                     f"💧 **油分率**: {float(o_rat):.1f}% （水層 {w_amt}g / 油層"
                     f" {o_amt}g）  \n"
-                    f"🔥 **40℃試験後粒径**: {d50_after}nm (Δ:"
-                    f" {float(d_d50):+.1f}nm) / ピーク面積比:"
-                    f" {p_ratio_40}  \n"
+                    f"🔥 **40℃後粒径**: {d50_after}nm (Δ:"
+                    f" {float(d_d50):+.1f}nm) / ピーク比:{p_ratio_40}  \n"
                     f"⚖️ **判定**: {row.get('stability_text', '')}"
                 )
 
-              with col3:
+              with col_btn:
 
                 def get_val(key, default="-"):
                   val = row.get(key, default)
@@ -1063,7 +1053,7 @@ with tab3:
                       else default
                   )
 
-                with st.popover("📄 詳細データを参照"):
+                with st.popover("📄 詳細参照"):
                   st.markdown(f"### 🔍 処方データ詳細: {pres_title}")
                   st.write(f"**登録ID**: {index}")
                   st.write(f"**提出日**: {get_val('date')}")
