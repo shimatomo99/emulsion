@@ -11,7 +11,7 @@ import streamlit as st
 # データの保存先CSV
 DATA_FILE = "dataset.csv"
 
-# --- ページ全体のデザイン設定（入力枠を白く見やすく改善） ---
+# --- ページ全体のデザイン設定（ブルー＆クリーンな知的人気テーマ） ---
 st.set_page_config(
     page_title="乳化安定性 予測AIアプリ", page_icon="🧪", layout="wide"
 )
@@ -28,19 +28,17 @@ st.markdown(
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     
-    /* 📝 すべての入力フォーム・セレクトボックス・数値入力の枠を「白」くくっきりさせる */
+    /* 入力フォーム・セレクトボックスの背景を「白」くくっきりさせる */
     input, select, textarea {
         background-color: #ffffff !important;
         color: #0f172a !important;
     }
     
-    /* Streamlitの各入力ウィジェットの中身（インプットボックス）を強制的に白背景にする */
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div, div[data-baseweb="base-input"] {
         background-color: #ffffff !important;
         border-color: #94a3b8 !important;
     }
     
-    /* 数値入力やテキスト入力のラベル文字を見やすく */
     label {
         color: #1e293b !important;
         font-weight: 500;
@@ -70,9 +68,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("🧪 乳化安定性 予測AIアシスタント")
+st.title(
+    "🧪 乳化安定性 予測AIアシスタント（粒度分布・ピーク範囲指定解析対応）"
+)
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>高精度な画像解析とAI予測で、界面化学・乳化処方の研究をサポートします。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>ピーク範囲の指定と面積比、ΔD50変化量から相分離予兆を高精度に診断します。</p>",
     unsafe_allow_html=True,
 )
 
@@ -159,8 +159,10 @@ def extract_advanced_image_features(image_file):
 
 # --- 1. データ提出タブ ---
 with tab1:
-  st.header("実験データの提出")
-  st.markdown("新規試作や評価データを登録します。")
+  st.header("実験データの提出（ピーク範囲指定・面積比対応）")
+  st.markdown(
+      "初期・試験後の粒径変化（ΔD50）に加え、各ピークの検出範囲と面積比を登録します。"
+  )
 
   submit_date = st.date_input(
       "実験・提出日", datetime.date.today(), key="sub_date"
@@ -177,7 +179,7 @@ with tab1:
       key="sub_emulsifier",
   )
 
-  st.subheader("📊 虐待試験・物性条件の入力")
+  st.subheader("📊 虐待試験・粒度分布ピーク範囲の入力")
   col_c1, col_c2 = st.columns(2)
   with col_c1:
     temperature = st.number_input(
@@ -188,14 +190,41 @@ with tab1:
         step=1.0,
         key="sub_temp",
     )
-    particle_size = st.number_input(
-        "平均粒径 (nm)",
+    initial_d50 = st.number_input(
+        "製造直後の初期 平均粒径 (nm)",
         min_value=0.0,
         max_value=10000.0,
         value=200.0,
         step=10.0,
-        key="sub_size",
+        key="sub_init_d50",
     )
+
+    st.markdown("---")
+    st.markdown("#### 山1（第1ピーク）の範囲と面積比")
+    peak1_min = st.number_input(
+        "第1ピーク 最小値 (nm)",
+        min_value=0.0,
+        value=50.0,
+        step=10.0,
+        key="sub_p1_min",
+    )
+    peak1_max = st.number_input(
+        "第1ピーク 最大値 (nm)",
+        min_value=0.0,
+        value=500.0,
+        step=10.0,
+        key="sub_p1_max",
+    )
+    peak1_ratio = st.number_input(
+        "第1ピークの面積比 (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=95.0,
+        step=0.5,
+        format="%.1f",
+        key="sub_p1_ratio",
+    )
+
   with col_c2:
     test_days = st.number_input(
         "虐待試験 期間 (日)",
@@ -205,15 +234,56 @@ with tab1:
         step=1,
         key="sub_test_days",
     )
-    turbidity = st.number_input(
-        "濁度 (吸光度など)",
+    after_d50 = st.number_input(
+        "試験終了後の 平均粒径 (nm)",
         min_value=0.0,
-        max_value=10.0,
-        value=1.0000,
-        step=0.0001,
-        format="%.4f",
-        key="sub_turbidity",
+        max_value=10000.0,
+        value=220.0,
+        step=10.0,
+        key="sub_after_d50",
     )
+
+    st.markdown("---")
+    st.markdown("#### 山2（第2ピーク / 粗大・合一）の範囲と面積比")
+    peak2_min = st.number_input(
+        "第2ピーク 最小値 (nm)",
+        min_value=0.0,
+        value=500.0,
+        step=10.0,
+        key="sub_p2_min",
+    )
+    peak2_max = st.number_input(
+        "第2ピーク 最大値 (nm)",
+        min_value=0.0,
+        value=5000.0,
+        step=10.0,
+        key="sub_p2_max",
+    )
+    peak2_ratio = st.number_input(
+        "第2ピークの面積比 (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=5.0,
+        step=0.5,
+        format="%.1f",
+        key="sub_p2_ratio",
+    )
+
+  delta_d50 = after_d50 - initial_d50
+  st.info(
+      f"📈 **変化量プレビュー (ΔD50)**: {delta_d50:+.1f} nm （初期値からのシフト"
+      f"量） | **第2ピーク比率**: {peak2_ratio}%"
+  )
+
+  turbidity = st.number_input(
+      "濁度 (吸光度など)",
+      min_value=0.0,
+      max_value=10.0,
+      value=1.0000,
+      step=0.0001,
+      format="%.4f",
+      key="sub_turbidity",
+  )
 
   condition_memo = st.text_input(
       "その他メモ（例: 遠心分離 3000rpm、ホモジナイザー条件など）",
@@ -273,7 +343,16 @@ with tab1:
           "emulsifier": emulsifier,
           "temperature": temperature,
           "test_days": test_days,
-          "particle_size": particle_size,
+          "initial_d50": initial_d50,
+          "after_d50": after_d50,
+          "delta_d50": delta_d50,
+          "peak1_min": peak1_min,
+          "peak1_max": peak1_max,
+          "peak1_ratio": peak1_ratio,
+          "peak2_min": peak2_min,
+          "peak2_max": peak2_max,
+          "peak2_ratio": peak2_ratio,
+          "particle_size": after_d50,
           "turbidity": turbidity,
           "condition": str(condition_memo) if condition_memo else "",
           "stability_text": stability,
@@ -300,17 +379,18 @@ with tab1:
       df["condition"] = df["condition"].astype(str)
       df.to_csv(DATA_FILE, index=False)
       st.success(
-          "データを正常に保存しました！ OpenCVによる粒子解析（検出数:"
-          f" {int(p_count)}個、平均円形度: {m_circ:.2f}）も完了しました。"
+          "データを正常に保存しました！ ΔD50: "
+          f"{delta_d50:+.1f}nm、第2ピーク比率({peak2_min}〜{peak2_max}nm):"
+          f" {peak2_ratio}% の登録が完了しました。"
       )
     else:
       st.warning("写真をアップロードまたは撮影してください。")
 
 # --- 2. 予測・確認タブ ---
 with tab2:
-  st.header("AIによる安定性予測・高度画像診断")
+  st.header("AIによる安定性予測・ピーク範囲診断")
   st.markdown(
-      "画像解析メトリクスと実験条件から、AIが分離リスクと改善アドバイスを提示します。"
+      "指定したピーク範囲と面積比、粒径変化スピード（ΔD50）から、AIが分離予兆を高精度に診断します。"
   )
 
   pred_emulsifier = st.selectbox(
@@ -325,20 +405,83 @@ with tab2:
     pred_temp = st.number_input(
         "予測時の試験 温度 (℃)", value=60.0, key="pred_temp"
     )
-    pred_size = st.number_input(
-        "測定された 平均粒径 (nm)", value=200.0, key="pred_size"
+    pred_init_d50 = st.number_input(
+        "予測時の初期 平均粒径 (nm)", value=200.0, key="pred_init_d50"
     )
+
+    st.markdown("---")
+    st.markdown("#### 予測時 山1（第1ピーク）の範囲と面積比")
+    pred_p1_min = st.number_input(
+        "第1ピーク 最小値 (nm)",
+        min_value=0.0,
+        value=50.0,
+        step=10.0,
+        key="pred_p1_min",
+    )
+    pred_p1_max = st.number_input(
+        "第1ピーク 最大値 (nm)",
+        min_value=0.0,
+        value=500.0,
+        step=10.0,
+        key="pred_p1_max",
+    )
+    pred_p1_ratio = st.number_input(
+        "第1ピークの面積比 (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=95.0,
+        step=0.5,
+        format="%.1f",
+        key="pred_p1_ratio",
+    )
+
   with col_p2:
     pred_test_days = st.number_input(
         "予測時の試験 期間 (日)", value=14, key="pred_test_days"
     )
-    pred_turbidity = st.number_input(
-        "測定された 濁度",
-        value=1.0000,
-        step=0.0001,
-        format="%.4f",
-        key="pred_turbidity",
+    pred_after_d50 = st.number_input(
+        "予測時の試験後 平均粒径 (nm)", value=220.0, key="pred_after_d50"
     )
+
+    st.markdown("---")
+    st.markdown("#### 予測時 山2（第2ピーク）の範囲と面積比")
+    pred_p2_min = st.number_input(
+        "第2ピーク 最小値 (nm)",
+        min_value=0.0,
+        value=500.0,
+        step=10.0,
+        key="pred_p2_min",
+    )
+    pred_p2_max = st.number_input(
+        "第2ピーク 最大値 (nm)",
+        min_value=0.0,
+        value=5000.0,
+        step=10.0,
+        key="pred_p2_max",
+    )
+    pred_p2_ratio = st.number_input(
+        "第2ピークの面積比 (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=5.0,
+        step=0.5,
+        format="%.1f",
+        key="pred_p2_ratio",
+    )
+
+  pred_delta_d50 = pred_after_d50 - pred_init_d50
+  st.info(
+      f"📈 **予測時 ΔD50 変化量**: {pred_delta_d50:+.1f} nm | **第2ピーク比率"
+      f" ({pred_p2_min}〜{pred_p2_max}nm)**: {pred_p2_ratio}%"
+  )
+
+  pred_turbidity = st.number_input(
+      "測定された 濁度",
+      value=1.0000,
+      step=0.0001,
+      format="%.4f",
+      key="pred_turbidity",
+  )
 
   pred_file = st.file_uploader(
       "📸 確認用コロイドの顕微鏡写真をアップロード（またはスマホカメラで撮影）",
@@ -346,7 +489,7 @@ with tab2:
       key="pred_file",
   )
 
-  if st.button("確認ボタン（高度AI予測を実行）"):
+  if st.button("確認ボタン（高精度AI予測を実行）"):
     if pred_file is not None:
       if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
         st.warning("学習データがまだありません。データを登録してください。")
@@ -364,6 +507,15 @@ with tab2:
           )
         else:
           feature_cols = [
+              "delta_d50",
+              "initial_d50",
+              "after_d50",
+              "peak1_min",
+              "peak1_max",
+              "peak1_ratio",
+              "peak2_min",
+              "peak2_max",
+              "peak2_ratio",
               "particle_count",
               "mean_area",
               "circularity",
@@ -371,7 +523,6 @@ with tab2:
               "img_std",
               "temperature",
               "test_days",
-              "particle_size",
               "turbidity",
           ]
           for col in feature_cols:
@@ -396,6 +547,15 @@ with tab2:
                 extract_advanced_image_features(pred_file)
             )
             X_pred = np.array([[
+                pred_delta_d50,
+                pred_init_d50,
+                pred_after_d50,
+                pred_p1_min,
+                pred_p1_max,
+                pred_p1_ratio,
+                pred_p2_min,
+                pred_p2_max,
+                pred_p2_ratio,
                 p_count,
                 m_area,
                 m_circ,
@@ -403,7 +563,6 @@ with tab2:
                 p_std,
                 pred_temp,
                 pred_test_days,
-                pred_size,
                 pred_turbidity,
             ]])
 
@@ -431,23 +590,21 @@ with tab2:
                   f"（予測確信度: {confidence:.1f}%）"
               )
               st.warning(
-                  f"⚠️ **注意喚起**: 過去の同条件データでは平均 **約"
-                  f" {avg_unstable_days} 日前後** で分離の兆候があります。"
+                  f"⚠️ **寿命予測の注意喚起**: 指定された第2ピーク範囲（"
+                  f"{pred_p2_min}〜{pred_p2_max}nm）の面積比率（{pred_p2_ratio}%）"
+                  f"や粒径変化スピードの傾向から推測して、過去データでは **約"
+                  f" {avg_unstable_days} 日前後** で破綻する恐れがあります。"
               )
 
               st.info("🤖 **AIからの改善ヒント・アドバイス**")
               advice_list = []
-              if m_circ < 0.7:
+              if pred_p2_ratio > 3.0:
                 advice_list.append(
-                    "・**粒子の円形度が低下しています**：液滴が変形・合一（コアレッセンス）を起こし始めている可能性があります。界面膜の強度アップを検討してください。"
+                    f"・**第2ピーク（{pred_p2_min}〜{pred_p2_max}nm）の比率が {pred_p2_ratio}% と高めです**：粗大粒子や合一粒子が一定割合存在しており、相分離（クリーミング等）の引き金になります。ホモジナイザーの出力強化や乳化剤の再選定を推奨します。"
                 )
-              if p_count > 150:
+              if pred_delta_d50 > 30:
                 advice_list.append(
-                    "・**粒子数が多すぎます（高濃度過密）**：オストワルド熟成や凝集が促進されやすいため、希釈率や乳化剤の再選定が有効です。"
-                )
-              if pred_size > 300:
-                advice_list.append(
-                    "・**平均粒径が大きめです**：ホモジナイザーの回転数を上げるか、乳化時間の延長を推奨します。"
+                    "・**粒径の変動スピード（ΔD50）が大きいです**：熱ストレスに対する耐性を高める処方再検討が必要です。"
                 )
               if not advice_list:
                 advice_list.append(
@@ -457,19 +614,22 @@ with tab2:
               for advice in advice_list:
                 st.write(advice)
 
-            st.subheader("💡 判定の理由と画像解析メトリクス")
+            st.subheader("💡 判定の理由とピーク範囲指標")
             st.write(
                 f"- **乳化剤**: {pred_emulsifier} （学習データ数:"
                 f" {len(train_clean)}件）"
             )
             st.write(
-                f"- **OpenCV解析結果**: 検出粒子数 `{int(p_count)}個` / 平均面積"
-                f" `{m_area:.1f} px` / 平均円形度 `{m_circ:.2f}`"
+                f"- **第1ピーク範囲**: {pred_p1_min}〜{pred_p1_max}nm （比率:"
+                f" {pred_p1_ratio}%）"
             )
             st.write(
-                f"- **入力条件**: 温度 {pred_temp}℃ / 期間"
-                f" {pred_test_days}日 / 粒径 {pred_size}nm / 濁度"
-                f" {pred_turbidity:.4f}"
+                f"- **第2ピーク範囲**: {pred_p2_min}〜{pred_p2_max}nm （比率:"
+                f" {pred_p2_ratio}%）"
+            )
+            st.write(
+                f"- **経時変化指標**: ΔD50 `{pred_delta_d50:+.1f}nm` | 画像解析"
+                f" 粒子数 `{int(p_count)}個`"
             )
     else:
       st.warning("確認用の写真をアップロードまたは撮影してください。")
@@ -572,20 +732,24 @@ with tab3:
                 f" {row.get('emulsifier', '')}）"
             )
 
-            turb_val = row.get("turbidity", 0.0)
-            turb_str = (
-                f"{float(turb_val):.4f}" if pd.notnull(turb_val) else "-"
-            )
-            p_cnt = row.get("particle_count", 0)
-            m_circ = row.get("circularity", 0)
+            d50_init = row.get("initial_d50", "-")
+            d50_after = row.get("after_d50", "-")
+            d_d50 = row.get("delta_d50", 0)
+            p1_min = row.get("peak1_min", 50)
+            p1_max = row.get("peak1_max", 500)
+            p1_rat = row.get("peak1_ratio", 95)
+            p2_min = row.get("peak2_min", 500)
+            p2_max = row.get("peak2_max", 5000)
+            p2_rat = row.get("peak2_ratio", 5)
 
             st.write(
                 f"📅 **提出日**: {row.get('date', '不明')}  \n"
                 f"🌡️ **試験条件**: 温度 {row.get('temperature', '-')}℃ / 期間"
                 f" {row.get('test_days', '-')}日  \n"
-                f"🔬 **物性・画像値**: 粒径 {row.get('particle_size', '-')}nm /"
-                f" 粒子数 {int(p_cnt)}個 / 円形度"
-                f" {float(m_circ):.2f}  \n"
+                f"📈 **粒径ダイナミクス**: 初期 {d50_init}nm → 試験後"
+                f" {d50_after}nm (ΔD50: {float(d_d50):+.1f}nm)  \n"
+                f"📊 **ピーク範囲指定**: 山1({p1_min}〜{p1_max}nm: {p1_rat}%) /"
+                f" 山2({p2_min}〜{p2_max}nm: {p2_rat}%)  \n"
                 f"⚖️ **判定**: {row.get('stability_text', '')}"
             )
             if "不安定" in str(row.get("stability_text", "")):
@@ -606,17 +770,20 @@ with tab3:
                   value=float(row.get("temperature", 60.0)),
                   key=f"edit_temp_{index}",
               )
-              edit_size = st.number_input(
-                  "平均粒径 (nm)",
-                  value=float(row.get("particle_size", 200.0)),
-                  key=f"edit_size_{index}",
+              edit_init = st.number_input(
+                  "初期平均粒径 (nm)",
+                  value=float(row.get("initial_d50", 200.0)),
+                  key=f"edit_init_{index}",
               )
-              edit_turb = st.number_input(
-                  "濁度",
-                  value=float(row.get("turbidity", 1.0)),
-                  format="%.4f",
-                  step=0.0001,
-                  key=f"edit_turb_{index}",
+              edit_after = st.number_input(
+                  "試験後 平均粒径 (nm)",
+                  value=float(row.get("after_d50", 220.0)),
+                  key=f"edit_after_{index}",
+              )
+              edit_p2_rat = st.number_input(
+                  "第2ピーク面積比 (%)",
+                  value=float(row.get("peak2_ratio", 5.0)),
+                  key=f"edit_p2_rat_{index}",
               )
               edit_cond = st.text_input(
                   "その他メモ",
@@ -634,8 +801,11 @@ with tab3:
 
                 df.loc[index, "prescription_no"] = str(edit_pres)
                 df.loc[index, "temperature"] = float(edit_temp)
-                df.loc[index, "particle_size"] = float(edit_size)
-                df.loc[index, "turbidity"] = float(edit_turb)
+                df.loc[index, "initial_d50"] = float(edit_init)
+                df.loc[index, "after_d50"] = float(edit_after)
+                df.loc[index, "delta_d50"] = float(edit_after - edit_init)
+                df.loc[index, "peak2_ratio"] = float(edit_p2_rat)
+                df.loc[index, "particle_size"] = float(edit_after)
                 df.loc[index, "condition"] = str(edit_cond)
                 df.to_csv(DATA_FILE, index=False)
                 st.success("更新しました！")
@@ -682,24 +852,19 @@ with tab4:
       st.divider()
 
       st.subheader(
-          "🔬 2. 平均粒径と試験温度の関係（安定・不安定の分布マップ）"
+          "🔬 2. 試験温度と粒子サイズの関係（安定・不安定の分布マップ）"
       )
       if (
           "temperature" in df_stats.columns
-          and "particle_size" in df_stats.columns
+          and "after_d50" in df_stats.columns
       ):
         chart_data = df_stats[
-            [
-                "temperature",
-                "particle_size",
-                "status_label",
-                "prescription_no",
-            ]
+            ["temperature", "after_d50", "status_label", "prescription_no"]
         ]
         st.scatter_chart(
             chart_data,
             x="temperature",
-            y="particle_size",
+            y="after_d50",
             color="status_label",
             size=50,
         )
