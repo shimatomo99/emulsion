@@ -1,0 +1,3 @@
+date,prescription_no,emulsifier,temperature,test_days,particle_size,turbidity,condition,stability_text,is_stable,days,image_path,img_mean,img_std
+2026-10-10,A200C034,アラビアガム,59.97,14,199.97,1.0,,安定（長期間分離しない）,1,270,data/arabic_gum\img_s453_01.jpg,145.5485,21.35386259555868
+2026-10-10,A200C028,アラビアガム,60.0,14,200.0,1.0,,安定（長期間分離しない）,1,270,data/arabic_gum\img_s453_01.jpg,145.5485,21.35386259555868
