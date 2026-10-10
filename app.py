@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（データ詳細照会・修正完全版）"
+    "🧪 乳化安定性 予測AIアシスタント（全項目完全照会・編集対応版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>ピーク範囲（上りはじめ・下がり終わり）と面積のデータを正しく保存・照会できます。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>すべての入力・測定項目の詳細照会および完全編集に対応しています。</p>",
     unsafe_allow_html=True,
 )
 
@@ -866,7 +866,7 @@ with tab3:
   st.header("📁 処方グループ別データまとめ・編集")
   st.markdown(
       "ベースコードが共通するデータをまとめ、日付順または名前順で並び替えて"
-      "確認・詳細参照できます。"
+      "確認・詳細参照および全項目の編集を行えます。"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -1016,7 +1016,7 @@ with tab3:
                 )
 
               with col3:
-                # --- 安全に各項目を取得するヘルパー関数 ---
+
                 def get_val(key, default="-"):
                   val = row.get(key, default)
                   return (
@@ -1025,35 +1025,37 @@ with tab3:
                       else default
                   )
 
+                # --- 1. 詳細参照ポップアップ（全項目を網羅して表示） ---
                 with st.popover("📄 詳細データを参照"):
                   st.markdown(f"### 🔍 処方データ詳細: {pres_title}")
                   st.write(f"**登録ID**: {index}")
                   st.write(f"**提出日**: {get_val('date')}")
                   st.write(f"**乳化剤**: {emuls_name}")
+
                   st.markdown("---")
-                  st.markdown("#### 💧 処方組成・初期値")
-                  st.write(f"- 水層の量: {get_val('water_amount')}")
-                  st.write(f"- 油層の量: {get_val('oil_amount')}")
-                  st.write(f"- 油分率: {get_val('oil_ratio')}%")
-                  st.write(f"- 初期平均粒径: {get_val('initial_d50')}")
-                  st.write(f"- 虐待前濁度: {get_val('initial_turbidity')}")
+                  st.markdown("#### 💧 処方組成・共通初期値")
+                  st.write(f"- 水層の量: {get_val('water_amount')} g")
+                  st.write(f"- 油層の量: {get_val('oil_amount')} g")
+                  st.write(f"- 油分率: {get_val('oil_ratio')} %")
+                  st.write(f"- 初期平均粒径: {get_val('initial_d50')} nm")
+                  st.write(f"- 虐待前（初期）濁度: {get_val('initial_turbidity')}")
 
                   st.markdown("---")
                   st.markdown("#### 🔥 40℃ 試験データ詳細")
-                  st.write(f"- 試験期間: {get_val('test_days')}")
-                  st.write(f"- 試験後平均粒径: {get_val('after_d50')}")
-                  st.write(f"- 粒径変動 (Δ): {get_val('delta_d50')}")
+                  st.write(f"- 試験期間: {get_val('test_days')} 日")
+                  st.write(f"- 試験後平均粒径: {get_val('after_d50')} nm")
+                  st.write(f"- 粒径変動 (Δ): {get_val('delta_d50')} nm")
                   st.write(f"- 試験後濁度: {get_val('turbidity')}")
                   st.write(
                       f"- 第1ピーク 範囲: {get_val('peak1_start', get_val('peak1_min'))}"
                       f" 〜"
-                      f" {get_val('peak1_end', get_val('peak1_max'))}"
+                      f" {get_val('peak1_end', get_val('peak1_max'))} nm"
                   )
                   st.write(f"- 第1ピーク 面積: {get_val('peak1_area')}")
                   st.write(
                       f"- 第2ピーク 範囲: {get_val('peak2_start', get_val('peak2_min'))}"
                       f" 〜"
-                      f" {get_val('peak2_end', get_val('peak2_max'))}"
+                      f" {get_val('peak2_end', get_val('peak2_max'))} nm"
                   )
                   st.write(f"- 第2ピーク 面積: {get_val('peak2_area')}")
                   st.write(
@@ -1062,10 +1064,20 @@ with tab3:
 
                   st.markdown("---")
                   st.markdown("#### ❄️ 5℃ 試験データ詳細")
-                  st.write(f"- 試験後平均粒径: {get_val('after_d50_5')}")
-                  st.write(f"- 試験後濁度: {get_val('turbidity_5')}")
+                  st.write(f"- 5℃試験後平均粒径: {get_val('after_d50_5')} nm")
+                  st.write(f"- 5℃試験後濁度: {get_val('turbidity_5')}")
                   st.write(
-                      f"- 第1/第2ピーク面積比: {get_val('peak_ratio_5')}"
+                      f"- 第1ピーク 範囲: {get_val('peak1_start_5')} 〜"
+                      f" {get_val('peak1_end_5')} nm"
+                  )
+                  st.write(f"- 第1ピーク 面積: {get_val('peak1_area_5')}")
+                  st.write(
+                      f"- 第2ピーク 範囲: {get_val('peak2_start_5')} 〜"
+                      f" {get_val('peak2_end_5')} nm"
+                  )
+                  st.write(f"- 第2ピーク 面積: {get_val('peak2_area_5')}")
+                  st.write(
+                      f"- **第1/第2ピーク面積比**: {get_val('peak_ratio_5')}"
                   )
 
                   st.markdown("---")
@@ -1076,8 +1088,9 @@ with tab3:
                   st.write(f"- メモ: {get_val('condition')}")
 
                 st.write("")
+                # --- 2. 編集ポップアップ（全項目をフォームから編集・保存可能） ---
                 with st.popover("🖥️ 編集"):
-                  st.write(
+                  st.markdown(
                       f"### ✏️ データの全項目編集 (ID: {index} / 処方:"
                       f" {row.get('prescription_no', '')})"
                   )
