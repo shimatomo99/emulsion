@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（未測定項目自動除外AI予測対応）"
+    "🧪 乳化安定性 予測AIアシスタント（ピーク別データなし一括切替対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>データなし項目（0）をAI予測時から自動除外し、測定済みデータのみで高精度に推察します。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>第一ピーク・第二ピークごとにまとめてデータなし設定が可能になりました。</p>",
     unsafe_allow_html=True,
 )
 
@@ -159,11 +159,8 @@ def extract_advanced_image_features(image_file):
 
 # --- 1. データ提出タブ ---
 with tab1:
-  st.header("実験データの提出（個別データなしボタン対応）")
-  st.markdown(
-      "各項目の横にある「データなし」にチェックを入れると、値が自動的に"
-      "「0」または「データなし」になります。"
-  )
+  st.header("実験データの提出")
+  st.markdown("処方組成、粒径ダイナミクス、ピーク範囲を登録します。")
 
   submit_date = st.date_input(
       "実験・提出日", datetime.date.today(), key="sub_date"
@@ -200,10 +197,7 @@ with tab1:
     if none_water:
       water_amount = 0.0
       st.number_input(
-          "水層の量 (g または mL)",
-          value=0.0,
-          disabled=True,
-          key="sub_water_dis",
+          "水層の量 (g)", value=0.0, disabled=True, key="sub_water_dis"
       )
     else:
       water_amount = st.number_input(
@@ -219,10 +213,7 @@ with tab1:
     if none_oil:
       oil_amount = 0.0
       st.number_input(
-          "油層の量 (g または mL)",
-          value=0.0,
-          disabled=True,
-          key="sub_oil_dis",
+          "油層の量 (g)", value=0.0, disabled=True, key="sub_oil_dis"
       )
     else:
       oil_amount = st.number_input(
@@ -259,10 +250,7 @@ with tab1:
     if none_init:
       initial_d50 = 0.0
       st.number_input(
-          "製造直後の初期 平均粒径 (nm)",
-          value=0.0,
-          disabled=True,
-          key="sub_init_dis",
+          "初期 平均粒径 (nm)", value=0.0, disabled=True, key="sub_init_dis"
       )
     else:
       initial_d50 = st.number_input(
@@ -275,49 +263,41 @@ with tab1:
       )
 
     st.markdown("---")
-    st.markdown("#### 山1（第1ピーク）の範囲と面積比")
-    peak1_min = st.number_input(
-        "第1ピーク 最小値 (nm)",
-        min_value=0.0,
-        value=50.0,
-        step=10.0,
-        key="sub_p1_min",
-    )
-    peak1_max = st.number_input(
-        "第1ピーク 最大値 (nm)",
-        min_value=0.0,
-        value=500.0,
-        step=10.0,
-        key="sub_p1_max",
-    )
-    peak1_ratio = st.number_input(
-        "第1ピークの面積比 (%)",
-        min_value=0.0,
-        max_value=100.0,
-        value=95.0,
-        step=0.5,
-        format="%.1f",
-        key="sub_p1_ratio",
-    )
+    # --- 第一ピーク一括データなし設定 ---
+    col_p1_title, col_p1_chk = st.columns([2, 1])
+    with col_p1_title:
+      st.markdown("#### 山1（第1ピーク）")
+    with col_p1_chk:
+      none_peak1 = st.checkbox("データなし", key="chk_sub_peak1")
 
-    none_coarse = st.checkbox("データなし", key="chk_sub_coarse")
-    if none_coarse:
-      coarse_ratio = 0.0
-      st.number_input(
-          "粗大粒子割合（1 μm以上 %）",
-          value=0.0,
-          disabled=True,
-          key="sub_coarse_dis",
-      )
+    if none_peak1:
+      peak1_min = 0.0
+      peak1_max = 0.0
+      peak1_ratio = 0.0
+      st.text("（第1ピーク: データなし設定中）")
     else:
-      coarse_ratio = st.number_input(
-          "粗大粒子割合（1 μm以上の積分比 %）",
+      peak1_min = st.number_input(
+          "第1ピーク 最小値 (nm)",
+          min_value=0.0,
+          value=50.0,
+          step=10.0,
+          key="sub_p1_min",
+      )
+      peak1_max = st.number_input(
+          "第1ピーク 最大値 (nm)",
+          min_value=0.0,
+          value=500.0,
+          step=10.0,
+          key="sub_p1_max",
+      )
+      peak1_ratio = st.number_input(
+          "第1ピークの面積比 (%)",
           min_value=0.0,
           max_value=100.0,
-          value=1.5,
-          step=0.1,
+          value=95.0,
+          step=0.5,
           format="%.1f",
-          key="sub_coarse",
+          key="sub_p1_ratio",
       )
 
   with col_c2:
@@ -334,7 +314,7 @@ with tab1:
     if none_after:
       after_d50 = 0.0
       st.number_input(
-          "試験終了後の 平均粒径 (nm)",
+          "試験後 平均粒径 (nm)",
           value=0.0,
           disabled=True,
           key="sub_after_dis",
@@ -350,32 +330,33 @@ with tab1:
       )
 
     st.markdown("---")
-    st.markdown("#### 山2（第2ピーク / 粗大・合一）の範囲と面積比")
-    peak2_min = st.number_input(
-        "第2ピーク 最小値 (nm)",
-        min_value=0.0,
-        value=500.0,
-        step=10.0,
-        key="sub_p2_min",
-    )
-    peak2_max = st.number_input(
-        "第2ピーク 最大値 (nm)",
-        min_value=0.0,
-        value=5000.0,
-        step=10.0,
-        key="sub_p2_max",
-    )
+    # --- 第二ピーク一括データなし設定 ---
+    col_p2_title, col_p2_chk = st.columns([2, 1])
+    with col_p2_title:
+      st.markdown("#### 山2（第2ピーク）")
+    with col_p2_chk:
+      none_peak2 = st.checkbox("データなし", key="chk_sub_peak2")
 
-    none_p2_rat = st.checkbox("データなし", key="chk_sub_p2_rat")
-    if none_p2_rat:
+    if none_peak2:
+      peak2_min = 0.0
+      peak2_max = 0.0
       peak2_ratio = 0.0
-      st.number_input(
-          "第2ピークの面積比 (%)",
-          value=0.0,
-          disabled=True,
-          key="sub_p2_rat_dis",
-      )
+      st.text("（第2ピーク: データなし設定中）")
     else:
+      peak2_min = st.number_input(
+          "第2ピーク 最小値 (nm)",
+          min_value=0.0,
+          value=500.0,
+          step=10.0,
+          key="sub_p2_min",
+      )
+      peak2_max = st.number_input(
+          "第2ピーク 最大値 (nm)",
+          min_value=0.0,
+          value=5000.0,
+          step=10.0,
+          key="sub_p2_max",
+      )
       peak2_ratio = st.number_input(
           "第2ピークの面積比 (%)",
           min_value=0.0,
@@ -386,18 +367,20 @@ with tab1:
           key="sub_p2_ratio",
       )
 
-  delta_d50 = after_d50 - initial_d50
+  delta_d50 = (
+      after_d50 - initial_d50
+      if not none_after and not none_init
+      else 0.0
+  )
   st.info(
       f"📈 **変化量プレビュー (ΔD50)**: {delta_d50:+.1f} nm | **第2ピーク比率**:"
-      f" {peak2_ratio}%"
+      f" {peak2_ratio if not none_peak2 else 0.0}%"
   )
 
   none_turb = st.checkbox("データなし", key="chk_sub_turb")
   if none_turb:
     turbidity = 0.0000
-    st.number_input(
-        "濁度 (吸光度など)", value=0.0, disabled=True, key="sub_turb_dis"
-    )
+    st.number_input("濁度", value=0.0, disabled=True, key="sub_turb_dis")
   else:
     turbidity = st.number_input(
         "濁度 (吸光度など)",
@@ -481,7 +464,6 @@ with tab1:
           "initial_d50": initial_d50,
           "after_d50": after_d50,
           "delta_d50": delta_d50,
-          "coarse_ratio": coarse_ratio,
           "peak1_min": peak1_min,
           "peak1_max": peak1_max,
           "peak1_ratio": peak1_ratio,
@@ -521,7 +503,9 @@ with tab1:
 # --- 2. 予測・確認タブ ---
 with tab2:
   st.header("AIによる安定性予測・ダイナミクス診断")
-  st.markdown("未測定項目は「データなし」にチェックを入れて予測できます。")
+  st.markdown(
+      "測定されていない項目やピークは「データなし」にチェックを入れて予測できます。"
+  )
 
   pred_emulsifier = st.selectbox(
       "評価する乳化剤を選択",
@@ -583,10 +567,7 @@ with tab2:
     if none_p_init:
       pred_init_d50 = 0.0
       st.number_input(
-          "予測時の初期 平均粒径 (nm)",
-          value=0.0,
-          disabled=True,
-          key="pred_init_dis",
+          "初期 平均粒径", value=0.0, disabled=True, key="pred_init_dis"
       )
     else:
       pred_init_d50 = st.number_input(
@@ -599,49 +580,41 @@ with tab2:
       )
 
     st.markdown("---")
-    st.markdown("#### 予測時 山1（第1ピーク）の範囲と面積比")
-    pred_p1_min = st.number_input(
-        "第1ピーク 最小値 (nm)",
-        min_value=0.0,
-        value=50.0,
-        step=10.0,
-        key="pred_p1_min",
-    )
-    pred_p1_max = st.number_input(
-        "第1ピーク 最大値 (nm)",
-        min_value=0.0,
-        value=500.0,
-        step=10.0,
-        key="pred_p1_max",
-    )
-    pred_p1_ratio = st.number_input(
-        "第1ピークの面積比 (%)",
-        min_value=0.0,
-        max_value=100.0,
-        value=95.0,
-        step=0.5,
-        format="%.1f",
-        key="pred_p1_ratio",
-    )
+    # --- 予測時 第一ピーク一括データなし設定 ---
+    col_pp1_title, col_pp1_chk = st.columns([2, 1])
+    with col_pp1_title:
+      st.markdown("#### 予測時 山1（第1ピーク）")
+    with col_pp1_chk:
+      none_p_peak1 = st.checkbox("データなし", key="chk_pred_peak1")
 
-    none_p_coarse = st.checkbox("データなし", key="chk_pred_coarse")
-    if none_p_coarse:
-      pred_coarse = 0.0
-      st.number_input(
-          "予測時の粗大粒子割合",
-          value=0.0,
-          disabled=True,
-          key="pred_coarse_dis",
-      )
+    if none_p_peak1:
+      pred_p1_min = 0.0
+      pred_p1_max = 0.0
+      pred_p1_ratio = 0.0
+      st.text("（第1ピーク: データなし設定中）")
     else:
-      pred_coarse = st.number_input(
-          "予測時の粗大粒子割合（1 μm以上 %）",
+      pred_p1_min = st.number_input(
+          "第1ピーク 最小値 (nm)",
+          min_value=0.0,
+          value=50.0,
+          step=10.0,
+          key="pred_p1_min",
+      )
+      pred_p1_max = st.number_input(
+          "第1ピーク 最大値 (nm)",
+          min_value=0.0,
+          value=500.0,
+          step=10.0,
+          key="pred_p1_max",
+      )
+      pred_p1_ratio = st.number_input(
+          "第1ピークの面積比 (%)",
           min_value=0.0,
           max_value=100.0,
-          value=1.5,
-          step=0.1,
+          value=95.0,
+          step=0.5,
           format="%.1f",
-          key="pred_coarse",
+          key="pred_p1_ratio",
       )
 
   with col_p2:
@@ -653,10 +626,7 @@ with tab2:
     if none_p_after:
       pred_after_d50 = 0.0
       st.number_input(
-          "予測時の試験後 平均粒径 (nm)",
-          value=0.0,
-          disabled=True,
-          key="pred_after_dis",
+          "試験後 平均粒径", value=0.0, disabled=True, key="pred_after_dis"
       )
     else:
       pred_after_d50 = st.number_input(
@@ -669,32 +639,33 @@ with tab2:
       )
 
     st.markdown("---")
-    st.markdown("#### 予測時 山2（第2ピーク）の範囲と面積比")
-    pred_p2_min = st.number_input(
-        "第2ピーク 最小値 (nm)",
-        min_value=0.0,
-        value=500.0,
-        step=10.0,
-        key="pred_p2_min",
-    )
-    pred_p2_max = st.number_input(
-        "第2ピーク 最大値 (nm)",
-        min_value=0.0,
-        value=5000.0,
-        step=10.0,
-        key="pred_p2_max",
-    )
+    # --- 予測時 第二ピーク一括データなし設定 ---
+    col_pp2_title, col_pp2_chk = st.columns([2, 1])
+    with col_pp2_title:
+      st.markdown("#### 予測時 山2（第2ピーク）")
+    with col_pp2_chk:
+      none_p_peak2 = st.checkbox("データなし", key="chk_pred_peak2")
 
-    none_p_p2_rat = st.checkbox("データなし", key="chk_pred_p2_rat")
-    if none_p_p2_rat:
+    if none_p_peak2:
+      pred_p2_min = 0.0
+      pred_p2_max = 0.0
       pred_p2_ratio = 0.0
-      st.number_input(
-          "第2ピーク面積比 (%)",
-          value=0.0,
-          disabled=True,
-          key="pred_p2_rat_dis",
-      )
+      st.text("（第2ピーク: データなし設定中）")
     else:
+      pred_p2_min = st.number_input(
+          "第2ピーク 最小値 (nm)",
+          min_value=0.0,
+          value=500.0,
+          step=10.0,
+          key="pred_p2_min",
+      )
+      pred_p2_max = st.number_input(
+          "第2ピーク 最大値 (nm)",
+          min_value=0.0,
+          value=5000.0,
+          step=10.0,
+          key="pred_p2_max",
+      )
       pred_p2_ratio = st.number_input(
           "第2ピークの面積比 (%)",
           min_value=0.0,
@@ -712,7 +683,7 @@ with tab2:
   )
   st.info(
       f"📈 **予測時 ΔD50**: {pred_delta_d50:+.1f} nm | **油分率**: "
-      f"{pred_oil_ratio:.1f}% | **第2ピーク比率**: {pred_p2_ratio}%"
+      f"{pred_oil_ratio:.1f}% | **第2ピーク比率**: {pred_p2_ratio if not none_p_peak2 else 0.0}%"
   )
 
   none_p_turb = st.checkbox("データなし", key="chk_pred_turb")
@@ -751,7 +722,6 @@ with tab2:
               "てください。"
           )
         else:
-          # --- ★「データなし（0）」の項目をAIの学習・予測から自動除外する仕組み ---
           base_feature_cols = [
               "oil_ratio",
               "water_amount",
@@ -759,7 +729,6 @@ with tab2:
               "delta_d50",
               "initial_d50",
               "after_d50",
-              "coarse_ratio",
               "peak1_min",
               "peak1_max",
               "peak1_ratio",
@@ -776,11 +745,6 @@ with tab2:
               "turbidity",
           ]
 
-          # 予測時にユーザーが「データなし（0）」にした項目は特徴量から除外する
-          active_feature_cols = []
-          pred_values = []
-
-          # 各入力とフラグの対応チェック
           val_map = {
               "oil_ratio": pred_oil_ratio,
               "water_amount": 0.0 if none_p_water else pred_water,
@@ -788,13 +752,12 @@ with tab2:
               "delta_d50": pred_delta_d50,
               "initial_d50": 0.0 if none_p_init else pred_init_d50,
               "after_d50": 0.0 if none_p_after else pred_after_d50,
-              "coarse_ratio": 0.0 if none_p_coarse else pred_coarse,
-              "peak1_min": pred_p1_min,
-              "peak1_max": pred_p1_max,
-              "peak1_ratio": pred_p1_ratio,
-              "peak2_min": pred_p2_min,
-              "peak2_max": pred_p2_max,
-              "peak2_ratio": 0.0 if none_p_p2_rat else pred_p2_ratio,
+              "peak1_min": 0.0 if none_p_peak1 else pred_p1_min,
+              "peak1_max": 0.0 if none_p_peak1 else pred_p1_max,
+              "peak1_ratio": 0.0 if none_p_peak1 else pred_p1_ratio,
+              "peak2_min": 0.0 if none_p_peak2 else pred_p2_min,
+              "peak2_max": 0.0 if none_p_peak2 else pred_p2_max,
+              "peak2_ratio": 0.0 if none_p_peak2 else pred_p2_ratio,
               "temperature": pred_temp,
               "test_days": pred_test_days,
               "turbidity": 0.0 if none_p_turb else pred_turbidity,
@@ -812,10 +775,9 @@ with tab2:
           }
           val_map.update(img_map)
 
-          # 0ではない（＝データがある）項目だけをAIの学習・予測に使用する
+          active_feature_cols = []
           for col in base_feature_cols:
             if col in train_df.columns:
-              # 履歴データ側で0でない、かつ予測入力側でも有効な数値の項目を採用
               if val_map[col] != 0.0 or col in [
                   "temperature",
                   "test_days",
@@ -882,7 +844,7 @@ with tab2:
               advice_list.append(
                   "・**油分率が高めの処方です**：乳化剤の増量を推奨します。"
               )
-            if not none_p_p2_rat and pred_p2_ratio > 3.0:
+            if not none_p_peak2 and pred_p2_ratio > 3.0:
               advice_list.append("・**第2ピーク比率が高めです**。")
             if not none_p_after and not none_p_init and pred_delta_d50 > 30:
               advice_list.append("・**粒径変動スピードが大きい**です。")
@@ -892,7 +854,7 @@ with tab2:
             for advice in advice_list:
               st.write(advice)
 
-          st.subheader("💡 判定の理由と使用された有効指標")
+          st.subheader("💡 判定の理由と指標")
           st.write(
               f"- **乳化剤**: {pred_emulsifier} （学習データ数:"
               f" {len(train_clean)}件）"
