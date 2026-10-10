@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（編集タブ対応・完全版）"
+    "🧪 乳化安定性 予測AIアシスタント（ピーク比率計算対応版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>データ提出時と同様に、編集画面でも5℃・40℃のタブで全パラメータを管理できます。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>ピークの上りはじめ・下がり終わりから第1/第2ピーク面積比を自動算出します。</p>",
     unsafe_allow_html=True,
 )
 
@@ -342,53 +342,53 @@ with tab1:
     with col_l1_5:
       none_p1_5 = st.checkbox("5℃ 第1ピーク：データなし", key="chk_p1_5")
       if none_p1_5:
-        peak1_min_5, peak1_max_5, peak1_ratio_5 = 0.0, 0.0, 0.0
+        peak1_start_5, peak1_end_5 = 0.0, 0.0
         st.text("（第1ピーク: なし）")
       else:
-        peak1_min_5 = st.number_input(
-            "5℃ 第1ピーク 最小値 (nm)",
+        peak1_start_5 = st.number_input(
+            "5℃ 第1ピーク 上りはじめ",
             value=50.0,
             step=10.0,
-            key="p1_min_5",
+            key="p1_start_5",
         )
-        peak1_max_5 = st.number_input(
-            "5℃ 第1ピーク 最大値 (nm)",
+        peak1_end_5 = st.number_input(
+            "5℃ 第1ピーク 下がり終わり",
             value=500.0,
             step=10.0,
-            key="p1_max_5",
-        )
-        peak1_ratio_5 = st.number_input(
-            "5℃ 第1ピーク 面積比 (%)",
-            value=95.0,
-            step=0.5,
-            format="%.1f",
-            key="p1_rat_5",
+            key="p1_end_5",
         )
     with col_l2_5:
       none_p2_5 = st.checkbox("5℃ 第2ピーク：データなし", key="chk_p2_5")
       if none_p2_5:
-        peak2_min_5, peak2_max_5, peak2_ratio_5 = 0.0, 0.0, 0.0
+        peak2_start_5, peak2_end_5 = 0.0, 0.0
         st.text("（第2ピーク: なし）")
       else:
-        peak2_min_5 = st.number_input(
-            "5℃ 第2ピーク 最小値 (nm)",
+        peak2_start_5 = st.number_input(
+            "5℃ 第2ピーク 上りはじめ",
             value=500.0,
             step=10.0,
-            key="p2_min_5",
+            key="p2_start_5",
         )
-        peak2_max_5 = st.number_input(
-            "5℃ 第2ピーク 最大値 (nm)",
+        peak2_end_5 = st.number_input(
+            "5℃ 第2ピーク 下がり終わり",
             value=5000.0,
             step=10.0,
-            key="p2_max_5",
+            key="p2_end_5",
         )
-        peak2_ratio_5 = st.number_input(
-            "5℃ 第2ピーク 面積比 (%)",
-            value=5.0,
-            step=0.5,
-            format="%.1f",
-            key="p2_rat_5",
-        )
+
+    # 第1ピーク・第2ピークの幅（下がり終わり - 上りはじめ）を簡易面積の代替、または比率の算出元とする
+    peak1_width_5 = (
+        max(0.0, peak1_end_5 - peak1_start_5) if not none_p1_5 else 0.0
+    )
+    peak2_width_5 = (
+        max(0.0, peak2_end_5 - peak2_start_5) if not none_p2_5 else 0.0
+    )
+    peak_ratio_5 = (
+        (peak1_width_5 / peak2_width_5)
+        if peak2_width_5 > 0
+        else (peak1_width_5 if peak1_width_5 > 0 else 0.0)
+    )
+    st.info(f"📊 算出された第1/第2ピーク比率 (5℃): {peak_ratio_5:.4f}")
 
     st.markdown("#### 📸 5℃条件の顕微鏡写真")
     file_5 = st.file_uploader(
@@ -452,53 +452,52 @@ with tab1:
     with col_l1_40:
       none_p1_40 = st.checkbox("40℃ 第1ピーク：データなし", key="chk_p1_40")
       if none_p1_40:
-        peak1_min_40, peak1_max_40, peak1_ratio_40 = 0.0, 0.0, 0.0
+        peak1_start_40, peak1_end_40 = 0.0, 0.0
         st.text("（第1ピーク: なし）")
       else:
-        peak1_min_40 = st.number_input(
-            "40℃ 第1ピーク 最小値 (nm)",
+        peak1_start_40 = st.number_input(
+            "40℃ 第1ピーク 上りはじめ",
             value=50.0,
             step=10.0,
-            key="p1_min_40",
+            key="p1_start_40",
         )
-        peak1_max_40 = st.number_input(
-            "40℃ 第1ピーク 最大値 (nm)",
+        peak1_end_40 = st.number_input(
+            "40℃ 第1ピーク 下がり終わり",
             value=500.0,
             step=10.0,
-            key="p1_max_40",
-        )
-        peak1_ratio_40 = st.number_input(
-            "40℃ 第1ピーク 面積比 (%)",
-            value=95.0,
-            step=0.5,
-            format="%.1f",
-            key="p1_rat_40",
+            key="p1_end_40",
         )
     with col_l2_40:
       none_p2_40 = st.checkbox("40℃ 第2ピーク：データなし", key="chk_p2_40")
       if none_p2_40:
-        peak2_min_40, peak2_max_40, peak2_ratio_40 = 0.0, 0.0, 0.0
+        peak2_start_40, peak2_end_40 = 0.0, 0.0
         st.text("（第2ピーク: なし）")
       else:
-        peak2_min_40 = st.number_input(
-            "40℃ 第2ピーク 最小値 (nm)",
+        peak2_start_40 = st.number_input(
+            "40℃ 第2ピーク 上りはじめ",
             value=500.0,
             step=10.0,
-            key="p2_min_40",
+            key="p2_start_40",
         )
-        peak2_max_40 = st.number_input(
-            "40℃ 第2ピーク 最大値 (nm)",
+        peak2_end_40 = st.number_input(
+            "40℃ 第2ピーク 下がり終わり",
             value=5000.0,
             step=10.0,
-            key="p2_max_40",
+            key="p2_end_40",
         )
-        peak2_ratio_40 = st.number_input(
-            "40℃ 第2ピーク 面積比 (%)",
-            value=5.0,
-            step=0.5,
-            format="%.1f",
-            key="p2_rat_40",
-        )
+
+    peak1_width_40 = (
+        max(0.0, peak1_end_40 - peak1_start_40) if not none_p1_40 else 0.0
+    )
+    peak2_width_40 = (
+        max(0.0, peak2_end_40 - peak2_start_40) if not none_p2_40 else 0.0
+    )
+    peak_ratio_40 = (
+        (peak1_width_40 / peak2_width_40)
+        if peak2_width_40 > 0
+        else (peak1_width_40 if peak1_width_40 > 0 else 0.0)
+    )
+    st.info(f"📊 算出された第1/第2ピーク比率 (40℃): {peak_ratio_40:.4f}")
 
     st.markdown("#### 📸 40℃条件の顕微鏡写真")
     file_40 = st.file_uploader(
@@ -572,17 +571,12 @@ with tab1:
           ),
           "after_d50": after_d50_40,
           "delta_d50": delta_d50_40,
-          "peak1_min": peak1_min_40,
-          "peak1_max": peak1_max_40,
-          "peak1_ratio": peak1_ratio_40,
-          "peak2_min": peak2_min_40,
-          "peak2_max": peak2_max_40,
-          "peak2_ratio": peak2_ratio_40,
-          "initial_d50_5": initial_d50,
-          "after_d50_5": after_d50_5,
-          "delta_d50_5": delta_d50_5,
-          "peak1_ratio_5": peak1_ratio_5,
-          "peak2_ratio_5": peak2_ratio_5,
+          "peak1_start": peak1_start_40,
+          "peak1_end": peak1_end_40,
+          "peak2_start": peak2_start_40,
+          "peak2_end": peak2_end_40,
+          "peak_ratio_40": peak_ratio_40,
+          "peak_ratio_5": peak_ratio_5,
           "turbidity_5": turbidity_5,
           "particle_size": after_d50_40,
           "turbidity": turbidity_40,
@@ -633,12 +627,7 @@ with tab1:
             "delta_d50",
             "initial_d50",
             "after_d50",
-            "peak1_min",
-            "peak1_max",
-            "peak1_ratio",
-            "peak2_min",
-            "peak2_max",
-            "peak2_ratio",
+            "peak_ratio_40",
             "particle_count",
             "mean_area",
             "circularity",
@@ -656,12 +645,7 @@ with tab1:
             "delta_d50": delta_d50_40,
             "initial_d50": 0.0 if none_init else initial_d50,
             "after_d50": 0.0 if none_after_40 else after_d50_40,
-            "peak1_min": 0.0 if none_p1_40 else peak1_min_40,
-            "peak1_max": 0.0 if none_p1_40 else peak1_max_40,
-            "peak1_ratio": 0.0 if none_p1_40 else peak1_ratio_40,
-            "peak2_min": 0.0 if none_p2_40 else peak2_min_40,
-            "peak2_max": 0.0 if none_p2_40 else peak2_max_40,
-            "peak2_ratio": 0.0 if none_p2_40 else peak2_ratio_40,
+            "peak_ratio_40": peak_ratio_40,
             "temperature": 40.0,
             "test_days": test_days_40,
             "turbidity": 0.0 if none_turb_40 else turbidity_40,
@@ -737,8 +721,8 @@ with tab1:
             advice_list.append(
                 "・**油分率が高めの処方です**：乳化剤の増量を推奨します。"
             )
-          if not none_p2_40 and peak2_ratio_40 > 3.0:
-            advice_list.append("・**40℃第2ピーク比率が高めです**。")
+          if peak_ratio_40 < 10.0:
+            advice_list.append("・**第1/第2ピーク比率が低めです**。")
           if not none_after_40 and not none_init and delta_d50_40 > 30:
             advice_list.append("・**40℃粒径変動スピードが大きい**です。")
           if not advice_list:
@@ -993,6 +977,7 @@ with tab3:
                 d_d50 = row.get("delta_d50", 0)
 
                 d50_after_5 = row.get("after_d50_5", "-")
+                p_ratio_40 = row.get("peak_ratio_40", "-")
 
                 st.write(
                     f"📅 **提出日**: {row.get('date', '不明')}  \n"
@@ -1000,8 +985,9 @@ with tab3:
                     f" {float(o_rat):.1f}%）  \n"
                     f"🔬 **共通初期値**: 初期粒径 {d50_init}nm / 虐待前濁度"
                     f" {turb_init}  \n"
-                    f"🔥 **40℃試験後**: {d50_after}nm (Δ: {float(d_d50):+.1f}nm)"
-                    f"  \n"
+                    f"🔥 **40℃試験後**: {d50_after}nm (Δ:"
+                    f" {float(d_d50):+.1f}nm) / ピーク比率:"
+                    f" {p_ratio_40}  \n"
                     f"❄️ **5℃試験後**: {d50_after_5}nm  \n"
                     f"⚖️ **判定**: {row.get('stability_text', '')}"
                 )
@@ -1114,39 +1100,25 @@ with tab3:
                         format="%.4f",
                         key=f"e_turb5_{index}",
                     )
-                    edit_p1_min_5 = st.number_input(
-                        "5℃ 第1ピーク 最小値",
-                        value=float(row.get("peak1_min", 50.0)),
-                        key=f"e_p1min5_{index}",
+                    edit_p1_start_5 = st.number_input(
+                        "5℃ 第1ピーク 上りはじめ",
+                        value=float(row.get("peak1_start", 50.0)),
+                        key=f"e_p1start5_{index}",
                     )
-                    edit_p1_max_5 = st.number_input(
-                        "5℃ 第1ピーク 最大値",
-                        value=float(row.get("peak1_max", 500.0)),
-                        key=f"e_p1max5_{index}",
+                    edit_p1_end_5 = st.number_input(
+                        "5℃ 第1ピーク 下がり終わり",
+                        value=float(row.get("peak1_end", 500.0)),
+                        key=f"e_p1end5_{index}",
                     )
-                    edit_p1_ratio_5 = st.number_input(
-                        "5℃ 第1ピーク比率 (%)",
-                        value=float(
-                            row.get("peak1_ratio_5", row.get("peak1_ratio", 95.0))
-                        ),
-                        key=f"e_p1rat5_{index}",
+                    edit_p2_start_5 = st.number_input(
+                        "5℃ 第2ピーク 上りはじめ",
+                        value=float(row.get("peak2_start", 500.0)),
+                        key=f"e_p2start5_{index}",
                     )
-                    edit_p2_min_5 = st.number_input(
-                        "5℃ 第2ピーク 最小値",
-                        value=float(row.get("peak2_min", 500.0)),
-                        key=f"e_p2min5_{index}",
-                    )
-                    edit_p2_max_5 = st.number_input(
-                        "5℃ 第2ピーク 最大値",
-                        value=float(row.get("peak2_max", 5000.0)),
-                        key=f"e_p2max5_{index}",
-                    )
-                    edit_p2_ratio_5 = st.number_input(
-                        "5℃ 第2ピーク比率 (%)",
-                        value=float(
-                            row.get("peak2_ratio_5", row.get("peak2_ratio", 5.0))
-                        ),
-                        key=f"e_p2rat5_{index}",
+                    edit_p2_end_5 = st.number_input(
+                        "5℃ 第2ピーク 下がり終わり",
+                        value=float(row.get("peak2_end", 5000.0)),
+                        key=f"e_p2end5_{index}",
                     )
 
                   with edit_tab_40:
@@ -1174,35 +1146,25 @@ with tab3:
                         format="%.4f",
                         key=f"e_turb40_{index}",
                     )
-                    edit_p1_min_40 = st.number_input(
-                        "40℃ 第1ピーク 最小値",
-                        value=float(row.get("peak1_min", 50.0)),
-                        key=f"e_p1min40_{index}",
+                    edit_p1_start_40 = st.number_input(
+                        "40℃ 第1ピーク 上りはじめ",
+                        value=float(row.get("peak1_start", 50.0)),
+                        key=f"e_p1start40_{index}",
                     )
-                    edit_p1_max_40 = st.number_input(
-                        "40℃ 第1ピーク 最大値",
-                        value=float(row.get("peak1_max", 500.0)),
-                        key=f"e_p1max40_{index}",
+                    edit_p1_end_40 = st.number_input(
+                        "40℃ 第1ピーク 下がり終わり",
+                        value=float(row.get("peak1_end", 500.0)),
+                        key=f"e_p1end40_{index}",
                     )
-                    edit_p1_ratio_40 = st.number_input(
-                        "40℃ 第1ピーク比率 (%)",
-                        value=float(row.get("peak1_ratio", 95.0)),
-                        key=f"e_p1rat40_{index}",
+                    edit_p2_start_40 = st.number_input(
+                        "40℃ 第2ピーク 上りはじめ",
+                        value=float(row.get("peak2_start", 500.0)),
+                        key=f"e_p2start40_{index}",
                     )
-                    edit_p2_min_40 = st.number_input(
-                        "40℃ 第2ピーク 最小値",
-                        value=float(row.get("peak2_min", 500.0)),
-                        key=f"e_p2min40_{index}",
-                    )
-                    edit_p2_max_40 = st.number_input(
-                        "40℃ 第2ピーク 最大値",
-                        value=float(row.get("peak2_max", 5000.0)),
-                        key=f"e_p2max40_{index}",
-                    )
-                    edit_p2_ratio_40 = st.number_input(
-                        "40℃ 第2ピーク比率 (%)",
-                        value=float(row.get("peak2_ratio", 5.0)),
-                        key=f"e_p2rat40_{index}",
+                    edit_p2_end_40 = st.number_input(
+                        "40℃ 第2ピーク 下がり終わり",
+                        value=float(row.get("peak2_end", 5000.0)),
+                        key=f"e_p2end40_{index}",
                     )
 
                   st.markdown("---")
@@ -1241,6 +1203,15 @@ with tab3:
                         1 if edit_stability.startswith("安定") else 0
                     )
 
+                    # 再計算
+                    e_w1 = max(0.0, edit_p1_end_40 - edit_p1_start_40)
+                    e_w2 = max(0.0, edit_p2_end_40 - edit_p2_start_40)
+                    new_pr_40 = (e_w1 / e_w2) if e_w2 > 0 else e_w1
+
+                    e_w1_5 = max(0.0, edit_p1_end_5 - edit_p1_start_5)
+                    e_w2_5 = max(0.0, edit_p2_end_5 - edit_p2_start_5)
+                    new_pr_5 = (e_w1_5 / e_w2_5) if e_w2_5 > 0 else e_w1_5
+
                     df.loc[index, "prescription_no"] = str(edit_pres)
                     df.loc[index, "emulsifier"] = edit_emulsifier
                     df.loc[index, "water_amount"] = float(edit_water)
@@ -1254,19 +1225,17 @@ with tab3:
                     df.loc[index, "after_d50"] = float(edit_after)
                     df.loc[index, "delta_d50"] = float(new_delta_40)
                     df.loc[index, "turbidity"] = float(edit_turb_40)
-                    df.loc[index, "peak1_min"] = float(edit_p1_min_40)
-                    df.loc[index, "peak1_max"] = float(edit_p1_max_40)
-                    df.loc[index, "peak1_ratio"] = float(edit_p1_ratio_40)
-                    df.loc[index, "peak2_min"] = float(edit_p2_min_40)
-                    df.loc[index, "peak2_max"] = float(edit_p2_max_40)
-                    df.loc[index, "peak2_ratio"] = float(edit_p2_ratio_40)
+                    df.loc[index, "peak1_start"] = float(edit_p1_start_40)
+                    df.loc[index, "peak1_end"] = float(edit_p1_end_40)
+                    df.loc[index, "peak2_start"] = float(edit_p2_start_40)
+                    df.loc[index, "peak2_end"] = float(edit_p2_end_40)
+                    df.loc[index, "peak_ratio_40"] = float(new_pr_40)
 
                     # 5℃データの反映
                     df.loc[index, "after_d50_5"] = float(edit_after_5)
                     df.loc[index, "delta_d50_5"] = float(new_delta_5)
                     df.loc[index, "turbidity_5"] = float(edit_turb_5)
-                    df.loc[index, "peak1_ratio_5"] = float(edit_p1_ratio_5)
-                    df.loc[index, "peak2_ratio_5"] = float(edit_p2_ratio_5)
+                    df.loc[index, "peak_ratio_5"] = float(new_pr_5)
 
                     df.loc[index, "condition"] = str(edit_cond)
                     df.loc[index, "stability_text"] = edit_stability
