@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（処方コード別グループ化対応）"
+    "🧪 乳化安定性 予測AIアシスタント（ベースコードまとめ & 自動枝番対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>処方ごとにデータをまとめて管理・比較できます（例: A234154C 形式）。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>ベースの処方コード（例: A200204C と -40℃など）をグループ化してまとめ、同名は自動で-2,-3に枝番分けします。</p>",
     unsafe_allow_html=True,
 )
 
@@ -99,7 +99,7 @@ if not st.session_state.authenticated:
 tab1, tab2, tab3, tab4 = st.tabs([
     "📁 データ提出・同時予測モード",
     "🔍 個別予測・確認モード",
-    "📊 処方別データまとめ・編集",
+    "📊 処方グループ別まとめ・編集",
     "📈 分析・統計（グラフ）",
 ])
 
@@ -161,8 +161,8 @@ def extract_advanced_image_features(image_file):
 with tab1:
   st.header("実験データの提出 & AI同時予測")
   st.markdown(
-      "新しい処方コード（例: A234154C）を入力し、データを提出すると同時にAIが"
-      "診断します。"
+      "新しい処方コード（例: A200204C や A200204C-40℃）を入力し、"
+      "提出と同時にAIが診断します。"
   )
 
   submit_date = st.date_input(
@@ -179,8 +179,8 @@ with tab1:
       )
     else:
       prescription_no = st.text_input(
-          "処方コード（例: A234154C）",
-          value="A234154C",
+          "処方コード（例: A200204C, A200204C-40℃ など）",
+          value="A200204C",
           key="sub_prescription",
       )
 
@@ -742,12 +742,13 @@ with tab2:
     else:
       st.warning("写真をアップロードしてください。")
 
-# --- 3. 処方別データまとめ・編集タブ ---
+# --- 3. 処方グループ別まとめ・編集タブ ---
 with tab3:
-  st.header("📁 処方コード別データまとめ・編集")
+  st.header("📁 処方グループ別データまとめ・編集")
   st.markdown(
-      "提出されたデータを**処方コード（例: A234154C）ごとにグループ化**して"
-      "まとめて表示します。各処方の詳細展開や大画面での全項目編集が可能です。"
+      "「A200204C」と「A200204C-40℃」のように、ベースコードが共通するデータは"
+      "1つのグループにまとめます。また、完全に同じ名前が重複した場合は自動で"
+      " `-2`, `-3` の枝番を振って別グループとして整理します。"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -765,9 +766,7 @@ with tab3:
     st.divider()
 
     search_query = st.text_input(
-        "🔍 処方コードで検索（例: A234154C、または一部の数字など）",
-        "",
-        key="hist_search_pres",
+        "🔍 処方コードで検索（例: A200204C など）", "", key="hist_search_pres"
     )
 
     df_display = df.copy()
@@ -785,17 +784,46 @@ with tab3:
       if "prescription_no" not in df_display.columns:
         df_display["prescription_no"] = "未設定"
 
-      # 処方コードごとにグループ化してアコード（エクスパンダー）で整理
-      prescription_groups = df_display.groupby("prescription_no")
+      # --- ★ベースコード抽出 & 同名自動枝番ロジック ---
+      # 例: "A200204C-40℃" -> ハイフンやスペースの前を「ベースコード」とする
+      base_groups = []
+      for p_no in df_display["prescription_no"].astype(str):
+        # 最初のハイフンやスペースの手前をベースコードとして抽出 (例: A200204C-40℃ -> A200204C)
+        base = p_no.split("-")[0].split(" ")[0].strip()
+        base_groups.append(base if base else "未設定")
+
+      df_display["base_prescription"] = base_groups
+
+      # 完全一致する名前が複数ある場合の「自動枝番 (-2, -3...)」の割り振り
+      unique_name_counts = {}
+      assigned_group_names = []
+
+      # 元のデータフレームのインデックス順にグループ名を決定
+      for idx, row in df_display.iterrows():
+        p_no = str(row["prescription_no"])
+        if p_no not in unique_name_counts:
+          unique_name_counts[p_no] = 0
+
+        unique_name_counts[p_no] += 1
+        count = unique_name_counts[p_no]
+
+        if count == 1:
+          assigned_group_names.append(p_no)
+        else:
+          assigned_group_names.append(f"{p_no}-{count}")
+
+      df_display["display_group_name"] = assigned_group_names
+
+      # 画面表示用のグループ化（表示用グループ名ごとにまとめる）
+      grouped = df_display.groupby("display_group_name")
 
       st.write(
-          f"登録されている処方コード数: **{len(prescription_groups)}種類** （総データ数:"
-          f" {len(df_display)}件）"
+          f"グループ数: **{len(grouped)}種類** （総データ数: {len(df_display)}件）"
       )
 
-      for pres_code, group_df in prescription_groups:
+      for group_name, group_df in grouped:
         with st.expander(
-            f"🏷️ 処方コード: {pres_code} （登録データ件数: {len(group_df)}件）",
+            f"🏷️ 処方グループ: {group_name} （データ件数: {len(group_df)}件）",
             expanded=True,
         ):
           for index, row in group_df.iterrows():
@@ -816,7 +844,8 @@ with tab3:
 
               with col2:
                 st.markdown(
-                    f"### 🧪 乳化剤: {row.get('emulsifier', '不明')}"
+                    f"### 🧪 登録名/条件: {row.get('prescription_no', '')} |"
+                    f" 乳化剤: {row.get('emulsifier', '不明')}"
                 )
 
                 w_amt = row.get("water_amount", "-")
@@ -851,14 +880,14 @@ with tab3:
                 with st.popover("🖥️ 大画面編集"):
                   st.write(
                       f"### ✏️ データの全項目編集 (ID: {index} / 処方:"
-                      f" {pres_code})"
+                      f" {row.get('prescription_no', '')})"
                   )
                   st.markdown(
                       "すべてのパラメータおよび個別「データなし」設定を変更できます。"
                   )
 
                   edit_pres = st.text_input(
-                      "処方コード（例: A234154C）",
+                      "処方コード（例: A200204C, A200204C-40℃ など）",
                       value=str(row.get("prescription_no", "")),
                       key=f"e_pres_{index}",
                   )
