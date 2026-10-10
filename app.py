@@ -1,5 +1,6 @@
 import datetime
 import os
+import cv2
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -10,7 +11,7 @@ import streamlit as st
 # データの保存先CSV
 DATA_FILE = "dataset.csv"
 
-st.title("🧪 乳化安定性 予測AIアプリ")
+st.title("🧪 乳化安定性 予測AIアプリ（OpenCV高度画像解析搭載）")
 
 # --- パスワード認証機能 ---
 if "authenticated" not in st.session_state:
@@ -40,30 +41,78 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 
-# --- 画像から簡易的な特徴量を取り出す関数 ---
-def extract_image_features(image_file):
+# --- OpenCVを用いた高度な画像解析関数 ---
+def extract_advanced_image_features(image_file):
   try:
-    img = Image.open(image_file).convert("L")  # グレースケール変換
-    img = img.resize((100, 100))  # サイズ統一
-    arr = np.array(img)
-    mean_val = np.mean(arr)  # 平均明るさ
-    std_val = np.std(arr)  # 濃淡のバラつき
-    return mean_val, std_val
-  except Exception:
-    return 0.0, 0.0
+    # アップロードされた画像ファイルをOpenCV形式（NumPy配列）に変換
+    file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
+    img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+    if img_cv is None:
+      return 0.0, 0.0, 0.0, 0.0, 0.0
+
+    # グレースケール変換とぼかし処理
+    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # 二値化（大津の二値化で自動しきい値処理）
+    _, thresh = cv2.threshold(
+        blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+    )
+
+    # 輪郭検出（粒子の抽出）
+    contours, _ = cv2.findContours(
+        thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    particle_count = 0
+    areas = []
+    circularities = []
+
+    for cnt in contours:
+      area = cv2.contourArea(cnt)
+      # 小さすぎるノイズや大きすぎる領域を除外
+      if 10 < area < 5000:
+        particle_count += 1
+        areas.append(area)
+        perimeter = cv2.arcLength(cnt, True)
+        if perimeter > 0:
+          # 円形度計算: 4 * pi * area / (perimeter ^ 2)
+          circularity = (4 * np.pi * area) / (perimeter**2)
+          circularities.append(min(circularity, 1.0))
+
+    # 特徴量の集計
+    mean_area = np.mean(areas) if areas else 0.0
+    mean_circ = np.mean(circularities) if circularities else 0.0
+    mean_brightness = np.mean(gray)
+    std_brightness = np.std(gray)
+
+    # ファイルポインタを先頭に戻す（他の処理で再読み込みできるようにする）
+    image_file.seek(0)
+
+    return (
+        float(particle_count),
+        float(mean_area),
+        float(mean_circ),
+        float(mean_brightness),
+        float(std_brightness),
+    )
+  except Exception as e:
+    st.error(f"画像解析エラー: {e}")
+    image_file.seek(0)
+    return 0.0, 0.0, 0.0, 0.0, 0.0
 
 
 # --- 1. データ提出タブ ---
 with tab1:
-  st.header("実験データの提出")
+  st.header("実験データの提出（高度画像解析対応）")
 
   submit_date = st.date_input(
       "実験・提出日", datetime.date.today(), key="sub_date"
   )
 
-  # 派生や温度付きの名前も自由に書き込める処方番号入力欄
   prescription_no = st.text_input(
-      "処方番号・派生メモ（例: FORM-001, F200-40℃, FORM-001-rev2 など）",
+      "処方番号・派生メモ（例: FORM-001, F200-40℃ など）",
       key="sub_prescription",
   )
 
@@ -149,10 +198,18 @@ with tab1:
       os.makedirs(save_dir, exist_ok=True)
 
       image_path = os.path.join(save_dir, uploaded_file.name)
-      img = Image.open(uploaded_file)
-      img.save(image_path)
 
-      mean_v, std_v = extract_image_features(uploaded_file)
+      # 画像保存用と解析用にファイルを分ける
+      img_bytes_for_save = uploaded_file.getvalue()
+      with open(image_path, "wb") as f:
+        f.write(img_bytes_for_save)
+
+      # OpenCVによる高度特徴量抽出
+      uploaded_file.seek(0)
+      p_count, m_area, m_circ, m_bright, s_bright = (
+          extract_advanced_image_features(uploaded_file)
+      )
+
       is_stable_val = 1 if stability.startswith("安定") else 0
 
       new_data = pd.DataFrame([{
@@ -170,8 +227,11 @@ with tab1:
           "is_stable": is_stable_val,
           "days": unstable_days,
           "image_path": image_path,
-          "img_mean": mean_v,
-          "img_std": std_v,
+          "particle_count": p_count,
+          "mean_area": m_area,
+          "circularity": m_circ,
+          "img_mean": m_bright,
+          "img_std": s_bright,
       }])
 
       if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 0:
@@ -186,15 +246,18 @@ with tab1:
       df["prescription_no"] = df["prescription_no"].astype(str)
       df["condition"] = df["condition"].astype(str)
       df.to_csv(DATA_FILE, index=False)
-      st.success("データを正常に保存しました！")
+      st.success(
+          "データを正常に保存しました！ OpenCVによる粒子解析（検出数:"
+          f" {int(p_count)}個、平均円形度: {m_circ:.2f}）も完了しました。"
+      )
     else:
       st.warning("写真をアップロードまたは撮影してください。")
 
-# --- 2. 予測・確認タブ（AIアドバイス・改善ヒント機能付き） ---
+# --- 2. 予測・確認タブ（OpenCV解析連動） ---
 with tab2:
-  st.header("AIによる安定性予測・改善アドバイス")
+  st.header("AIによる安定性予測・高度画像診断")
   st.info(
-      "条件と顕微鏡写真からAIがリスクを診断し、不安定な場合の改善ヒントを自動提案します。"
+      "OpenCVが顕微鏡写真の「粒子個数・面積・円形度」を自動算出し、AIモデルが総合的に判定します。"
   )
 
   pred_emulsifier = st.selectbox(
@@ -230,7 +293,7 @@ with tab2:
       key="pred_file",
   )
 
-  if st.button("確認ボタン（AI予測を実行）"):
+  if st.button("確認ボタン（高度AI予測を実行）"):
     if pred_file is not None:
       if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
         st.warning("学習データがまだありません。データを登録してください。")
@@ -248,6 +311,9 @@ with tab2:
           )
         else:
           feature_cols = [
+              "particle_count",
+              "mean_area",
+              "circularity",
               "img_mean",
               "img_std",
               "temperature",
@@ -255,6 +321,11 @@ with tab2:
               "particle_size",
               "turbidity",
           ]
+          # 古いデータに新しい解析列がない場合の保険
+          for col in feature_cols:
+            if col not in train_df.columns:
+              train_df[col] = 0.0
+
           train_clean = train_df.dropna(subset=feature_cols + ["is_stable"])
 
           if len(train_clean) < 2:
@@ -269,8 +340,13 @@ with tab2:
             model = RandomForestClassifier(n_estimators=10, random_state=42)
             model.fit(X, y_class)
 
-            p_mean, p_std = extract_image_features(pred_file)
+            p_count, m_area, m_circ, p_mean, p_std = (
+                extract_advanced_image_features(pred_file)
+            )
             X_pred = np.array([[
+                p_count,
+                m_area,
+                m_circ,
                 p_mean,
                 p_std,
                 pred_temp,
@@ -307,62 +383,62 @@ with tab2:
                   f" {avg_unstable_days} 日前後** で分離の兆候があります。"
               )
 
-              # 🤖 AIチャット風・改善アドバイスの自動生成
+              # AI改善アドバイス（OpenCVの円形度や粒子数も考慮）
               st.info("🤖 **AIからの改善ヒント・アドバイス**")
               advice_list = []
+              if m_circ < 0.7:
+                advice_list.append(
+                    "・**粒子の円形度が低下しています**：液滴が変形・合一（コアレッセンス）を起こし始めている可能性があります。界面膜の強度アップを検討してください。"
+                )
+              if p_count > 150:
+                advice_list.append(
+                    "・**粒子数が多すぎます（高濃度過密）**：オストワルド熟成や凝集が促進されやすいため、希釈率や乳化剤の再選定が有効です。"
+                )
               if pred_size > 300:
                 advice_list.append(
-                    "・**粒径がやや大きめです**：ホモジナイザーの回転数を上げるか、乳化時間の延長を検討してください。"
-                )
-              if pred_temp > 50:
-                advice_list.append(
-                    "・**高温度帯での試験です**：熱耐性を高めるために、乳化剤の配合量を少し増やす（数%アップ）か、安定化剤の併用が有効です。"
-                )
-              if p_std > train_clean["img_std"].mean():
-                advice_list.append(
-                    "・**粒子サイズのばらつき（凝集）が見られます**：界面張力を下げるためにプレ乳化の条件を見直してみてください。"
+                    "・**平均粒径が大きめです**：ホモジナイザーの回転数を上げるか、乳化時間の延長を推奨します。"
                 )
               if not advice_list:
                 advice_list.append(
-                    "・基本処方の微調整や、別系統の乳化剤（ポリグリやキラヤなど）との比較検討をおすすめします。"
+                    "・温度条件や試験期間の再確認、および他系統の乳化剤との比較をおすすめします。"
                 )
 
               for advice in advice_list:
                 st.write(advice)
 
-            st.subheader("💡 判定の理由と分析")
+            st.subheader("💡 判定の理由と画像解析メトリクス")
             st.write(
                 f"- **乳化剤**: {pred_emulsifier} （学習データ数:"
                 f" {len(train_clean)}件）"
+            )
+            st.write(
+                f"- **OpenCV解析結果**: 検出粒子数 `{int(p_count)}個` / 平均面積"
+                f" `{m_area:.1f} px` / 平均円形度 `{m_circ:.2f}`"
             )
             st.write(
                 f"- **入力条件**: 温度 {pred_temp}℃ / 期間"
                 f" {pred_test_days}日 / 粒径 {pred_size}nm / 濁度"
                 f" {pred_turbidity:.4f}"
             )
-            st.write(
-                f"- **画像特徴量**: 平均明るさ `{p_mean:.1f}`、粒子の濃淡バラつき"
-                f" `{p_std:.1f}`"
-            )
 
-            if p_std > train_clean["img_std"].mean():
+            if m_circ < 0.75:
               st.write(
-                  "  - ⚠️ 過去のデータと比較して**粒子のバラつき（標準偏差）が"
-                  "大きめ**です。"
+                  "  - ⚠️ 粒子の形が真円から崩れているため、安定性に懸念があり"
+                  "ます。"
               )
             else:
               st.write(
-                  "  - ✨ 過去の安定データと近い**良好な分散状態**を示していま"
-                  "す。"
+                  "  - ✨ 粒子がきれいな球形（高円形度）を保っており、良好な"
+                  "分散状態です。"
               )
     else:
       st.warning("確認用の写真をアップロードまたは撮影してください。")
 
-# --- 3. データ履歴・見返しタブ（派生管理・編集機能付き） ---
+# --- 3. データ履歴・見返しタブ ---
 with tab3:
   st.header("📁 提出データ履歴・見返し")
   st.info(
-      "処方番号や温度タグ（例: F200-40℃ など）で試行錯誤の歴史を追跡・編集できます。（最新20件まで表示）"
+      "処方番号や温度タグ、OpenCV解析値を含めて履歴を確認・編集できます。（最新20件まで表示）"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -462,13 +538,16 @@ with tab3:
             turb_str = (
                 f"{float(turb_val):.4f}" if pd.notnull(turb_val) else "-"
             )
+            p_cnt = row.get("particle_count", 0)
+            m_circ = row.get("circularity", 0)
 
             st.write(
                 f"📅 **提出日**: {row.get('date', '不明')}  \n"
                 f"🌡️ **試験条件**: 温度 {row.get('temperature', '-')}℃ / 期間"
                 f" {row.get('test_days', '-')}日  \n"
-                f"🔬 **物性値**: 平均粒径 {row.get('particle_size', '-')}nm /"
-                f" 濁度 {turb_str}  \n"
+                f"🔬 **物性・画像値**: 粒径 {row.get('particle_size', '-')}nm /"
+                f" 粒子数 {int(p_cnt)}個 / 円形度"
+                f" {float(m_circ):.2f}  \n"
                 f"⚖️ **判定**: {row.get('stability_text', '')}"
             )
             if "不安定" in str(row.get("stability_text", "")):
