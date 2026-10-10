@@ -7,8 +7,6 @@ from PIL import Image
 import sklearn
 from sklearn.ensemble import RandomForestClassifier
 import streamlit as st
-import plotly.graph_objects as go
-from streamlit_plotly_events import plotly_events
 
 # データの保存先CSV
 DATA_FILE = "dataset.csv"
@@ -70,9 +68,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("🧪 乳化安定性 予測AIアシスタント（グラフクリック面積計算対応版）")
+st.title(
+    "🧪 乳化安定性 予測AIアシスタント（編集タブ対応・完全版）"
+)
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>データ提出時の各温度タブ内にインタラクティブなグラフ面積計算ツールを搭載しています。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>データ提出時と同様に、編集画面でも5℃・40℃のタブで全パラメータを管理できます。</p>",
     unsafe_allow_html=True,
 )
 
@@ -157,197 +157,6 @@ def extract_advanced_image_features(image_file):
     return 0.0, 0.0, 0.0, 0.0, 0.0
 
 
-# --- Plotlyを用いたインタラクティブグラフ＆クリック面積計算ウィジェット ---
-def render_interactive_graph_area_calculator(key_suffix):
-  st.markdown(
-      "📉 **CSVグラフ ポイント抽出＆面積計算ツール**"
-      "（グラフ上の点をクリックすると値が自動入力されます）"
-  )
-
-  df_key = f"calc_df_{key_suffix}"
-  x_key = f"calc_x_{key_suffix}"
-  y_key = f"calc_y_{key_suffix}"
-  asc_key = f"calc_asc_{key_suffix}"
-  desc_key = f"calc_desc_{key_suffix}"
-  target_key = f"calc_target_{key_suffix}"
-  area_key = f"calc_area_{key_suffix}"
-
-  if df_key not in st.session_state:
-    st.session_state[df_key] = None
-    st.session_state[x_key] = None
-    st.session_state[y_key] = None
-    st.session_state[asc_key] = None
-    st.session_state[desc_key] = None
-    st.session_state[target_key] = "ascent"
-    st.session_state[area_key] = 0.0
-
-  uploaded_csv = st.file_uploader(
-      "解析用CSVファイルを選択", type=["csv"], key=f"csv_up_{key_suffix}"
-  )
-  if uploaded_csv is not None:
-    try:
-      temp_df = pd.read_csv(uploaded_csv)
-      if len(temp_df.columns) >= 2:
-        st.session_state[df_key] = temp_df
-        st.session_state[x_key] = temp_df.iloc[:, 0].values
-        st.session_state[y_key] = temp_df.iloc[:, 1].values
-        st.session_state[asc_key] = None
-        st.session_state[desc_key] = None
-    except Exception as e:
-      st.error(f"CSV読み込みエラー: {e}")
-
-  # 入力モード切替ラジオ
-  target_mode = st.radio(
-      "グラフをクリックしたときに入力する項目を選択:",
-      ["上りに入力", "下がりに入力"],
-      key=f"radio_target_{key_suffix}",
-      horizontal=True,
-  )
-  st.session_state[target_key] = (
-      "ascent" if target_mode == "上りに入力" else "descent"
-  )
-
-  col_input1, col_input2, col_input3 = st.columns(3)
-  with col_input1:
-    ascent_val = st.number_input(
-        "上りはじめ (X)",
-        value=(
-            float(st.session_state[asc_key])
-            if st.session_state[asc_key] is not None
-            else 0.0
-        ),
-        key=f"input_asc_{key_suffix}",
-    )
-    if ascent_val != 0.0:
-      st.session_state[asc_key] = ascent_val
-  with col_input2:
-    descent_val = st.number_input(
-        "下がり始め (X)",
-        value=(
-            float(st.session_state[desc_key])
-            if st.session_state[desc_key] is not None
-            else 0.0
-        ),
-        key=f"input_desc_{key_suffix}",
-    )
-    if descent_val != 0.0:
-      st.session_state[desc_key] = descent_val
-  with col_input3:
-    if (
-        st.session_state[asc_key] is not None
-        and st.session_state[desc_key] is not None
-        and st.session_state[x_key] is not None
-    ):
-      x_min = min(st.session_state[asc_key], st.session_state[desc_key])
-      x_max = max(st.session_state[asc_key], st.session_state[desc_key])
-      mask = (st.session_state[x_key] >= x_min) & (
-          st.session_state[x_key] <= x_max
-      )
-      if np.sum(mask) >= 2:
-        try:
-          calculated_area = np.trapezoid(
-              np.abs(st.session_state[y_key][mask]),
-              st.session_state[x_key][mask],
-          )
-        except AttributeError:
-          calculated_area = np.trapz(
-              np.abs(st.session_state[y_key][mask]),
-              st.session_state[x_key][mask],
-          )
-        st.session_state[area_key] = calculated_area
-        st.metric(label="計算された面積", value=f"{calculated_area:.4f}")
-      else:
-        st.metric(label="計算された面積", value="範囲のデータ不足")
-    else:
-      st.metric(label="計算された面積", value="-")
-
-  # Plotlyを使ったインタラクティブグラフの描画
-  if st.session_state[x_key] is not None and st.session_state[y_key] is not None:
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=st.session_state[x_key],
-            y=st.session_state[y_key],
-            mode="lines+markers",
-            name="Data",
-            line=dict(color="royalblue"),
-            marker=dict(size=5),
-        )
-    )
-
-    # 強調表示（上りはじめ・下がり始め）
-    if st.session_state[asc_key] is not None:
-      idx1 = np.argmin(np.abs(st.session_state[x_key] - st.session_state[asc_key]))
-      fig.add_trace(
-          go.Scatter(
-              x=[st.session_state[x_key][idx1]],
-              y=[st.session_state[y_key][idx1]],
-              mode="markers",
-              marker=dict(color="red", size=12),
-              name="上りはじめ",
-          )
-      )
-    if st.session_state[desc_key] is not None:
-      idx2 = np.argmin(
-          np.abs(st.session_state[x_key] - st.session_state[desc_key])
-      )
-      fig.add_trace(
-          go.Scatter(
-              x=[st.session_state[x_key][idx2]],
-              y=[st.session_state[y_key][idx2]],
-              mode="markers",
-              marker=dict(color="darkorange", size=12),
-              name="下がり始め",
-          )
-      )
-
-    fig.update_layout(
-        title="グラフ（クリックでポイント選択）",
-        xaxis_title=(
-            st.session_state[df_key].columns[0]
-            if st.session_state[df_key] is not None
-            else "X軸"
-        ),
-        yaxis_title=(
-            st.session_state[df_key].columns[1]
-            if st.session_state[df_key] is not None
-            else "Y軸"
-        ),
-        height=400,
-        margin=dict(l=20, r=20, t=40, b=20),
-        clickmode="event+select",
-    )
-
-    # plotly-eventsを使ってクリックされた座標を取得
-    selected_points = plotly_events(
-        fig,
-        click_event=True,
-        select_event=False,
-        hover_event=False,
-        key=f"plotly_evt_{key_suffix}",
-    )
-
-    if selected_points:
-      clicked_x = selected_points[0]["x"]
-      # 最も近いデータポイントのX座標を特定
-      distances = np.abs(st.session_state[x_key] - clicked_x)
-      nearest_idx = np.argmin(distances)
-      nearest_x = st.session_state[x_key][nearest_idx]
-
-      if st.session_state[target_key] == "ascent":
-        st.session_state[asc_key] = nearest_x
-        # 自動で次は「下がり」に切り替える
-        st.session_state[f"radio_target_{key_suffix}"] = "下がりに入力"
-      else:
-        st.session_state[desc_key] = nearest_x
-      st.rerun()
-
-  else:
-    st.info("CSVファイルをアップロードしてください。")
-
-  return st.session_state[area_key]
-
-
 # --- 1. データ提出・同時予測タブ ---
 with tab1:
   st.header("実験データの提出 & AI同時予測")
@@ -364,12 +173,9 @@ with tab1:
   with c_pres1:
     none_pres = st.checkbox("データなし", key="chk_sub_pres")
     if none_pres:
-      prescription_no = "data_none"
+      prescription_no = "データなし"
       st.text_input(
-          "処方コード",
-          value="データなし",
-          disabled=True,
-          key="sub_prescription_dis",
+          "処方コード", value="データなし", disabled=True, key="sub_prescription_dis"
       )
     else:
       prescription_no = st.text_input(
@@ -531,11 +337,6 @@ with tab1:
           key="turb_5",
       )
 
-    st.divider()
-    # 5℃用 インタラクティブグラフ計算ツールの埋め込み
-    calculated_area_5 = render_interactive_graph_area_calculator("5c")
-    st.divider()
-
     st.markdown("#### 🔬 5℃ レーザー解析（ピーク範囲）")
     col_l1_5, col_l2_5 = st.columns(2)
     with col_l1_5:
@@ -645,11 +446,6 @@ with tab1:
           format="%.4f",
           key="turb_40",
       )
-
-    st.divider()
-    # 40℃用 インタラクティブグラフ計算ツールの埋め込み
-    calculated_area_40 = render_interactive_graph_area_calculator("40c")
-    st.divider()
 
     st.markdown("#### 🔬 40℃ レーザー解析（ピーク範囲）")
     col_l1_40, col_l2_40 = st.columns(2)
@@ -776,8 +572,6 @@ with tab1:
           ),
           "after_d50": after_d50_40,
           "delta_d50": delta_d50_40,
-          "graph_area_40": calculated_area_40,
-          "graph_area_5": calculated_area_5,
           "peak1_min": peak1_min_40,
           "peak1_max": peak1_max_40,
           "peak1_ratio": peak1_ratio_40,
@@ -1199,7 +993,6 @@ with tab3:
                 d_d50 = row.get("delta_d50", 0)
 
                 d50_after_5 = row.get("after_d50_5", "-")
-                area_40 = row.get("graph_area_40", "-")
 
                 st.write(
                     f"📅 **提出日**: {row.get('date', '不明')}  \n"
@@ -1207,8 +1000,8 @@ with tab3:
                     f" {float(o_rat):.1f}%）  \n"
                     f"🔬 **共通初期値**: 初期粒径 {d50_init}nm / 虐待前濁度"
                     f" {turb_init}  \n"
-                    f"🔥 **40℃試験後**: {d50_after}nm (Δ:"
-                    f" {float(d_d50):+.1f}nm) / 面積: {area_40}  \n"
+                    f"🔥 **40℃試験後**: {d50_after}nm (Δ: {float(d_d50):+.1f}nm)"
+                    f"  \n"
                     f"❄️ **5℃試験後**: {d50_after_5}nm  \n"
                     f"⚖️ **判定**: {row.get('stability_text', '')}"
                 )
