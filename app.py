@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（データなし一括入力・ダイナミクス解析対応）"
+    "🧪 乳化安定性 予測AIアシスタント（未測定項目自動除外AI予測対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>データなし項目にも対応し、水油比率・ピーク範囲・ΔD50変化量から相分離予兆を高精度に診断します。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>データなし項目（0）をAI予測時から自動除外し、測定済みデータのみで高精度に推察します。</p>",
     unsafe_allow_html=True,
 )
 
@@ -157,59 +157,35 @@ def extract_advanced_image_features(image_file):
     return 0.0, 0.0, 0.0, 0.0, 0.0
 
 
-# --- セッションステート初期化（データなし機能用） ---
-if "sub_init_val" not in st.session_state:
-  st.session_state.sub_init_val = 200.0
-if "sub_after_val" not in st.session_state:
-  st.session_state.sub_after_val = 220.0
-if "sub_coarse_val" not in st.session_state:
-  st.session_state.sub_coarse_val = 1.5
-if "sub_p2_rat_val" not in st.session_state:
-  st.session_state.sub_p2_rat_val = 5.0
-if "sub_water_val" not in st.session_state:
-  st.session_state.sub_water_val = 80.0
-if "sub_oil_val" not in st.session_state:
-  st.session_state.sub_oil_val = 20.0
-if "sub_turb_val" not in st.session_state:
-  st.session_state.sub_turb_val = 1.0000
-if "sub_pres_val" not in st.session_state:
-  st.session_state.sub_pres_val = "FORM-001"
-if "sub_cond_val" not in st.session_state:
-  st.session_state.sub_cond_val = ""
-
-
 # --- 1. データ提出タブ ---
 with tab1:
-  st.header("実験データの提出（データなし対応）")
+  st.header("実験データの提出（個別データなしボタン対応）")
   st.markdown(
-      "未測定の項目がある場合は「データなし一括入力ボタン」をご利用ください。"
+      "各項目の横にある「データなし」にチェックを入れると、値が自動的に"
+      "「0」または「データなし」になります。"
   )
-
-  # データなし一括セットボタン
-  if st.button("📥 全未測定項目に「データなし」をセット", key="btn_sub_none"):
-    st.session_state.sub_init_val = 0.0
-    st.session_state.sub_after_val = 0.0
-    st.session_state.sub_coarse_val = 0.0
-    st.session_state.sub_p2_rat_val = 0.0
-    st.session_state.sub_water_val = 0.0
-    st.session_state.sub_oil_val = 0.0
-    st.session_state.sub_turb_val = 0.0000
-    st.session_state.sub_pres_val = "データなし"
-    st.session_state.sub_cond_val = "データなし"
-    st.success(
-        "未測定の項目に「データなし（0 / データなし）」をセットしました！"
-    )
-    st.rerun()
 
   submit_date = st.date_input(
       "実験・提出日", datetime.date.today(), key="sub_date"
   )
 
-  prescription_no = st.text_input(
-      "処方番号・派生メモ（例: FORM-001, F200-40℃ など）",
-      value=st.session_state.sub_pres_val,
-      key="sub_prescription",
-  )
+  c_pres1, c_pres2 = st.columns([3, 1])
+  with c_pres1:
+    none_pres = st.checkbox("データなし", key="chk_sub_pres")
+    if none_pres:
+      prescription_no = "データなし"
+      st.text_input(
+          "処方番号・派生メモ",
+          value="データなし",
+          disabled=True,
+          key="sub_prescription_dis",
+      )
+    else:
+      prescription_no = st.text_input(
+          "処方番号・派生メモ（例: FORM-001, F200-40℃ など）",
+          value="FORM-001",
+          key="sub_prescription",
+      )
 
   emulsifier = st.selectbox(
       "使用した乳化剤を選択",
@@ -220,23 +196,43 @@ with tab1:
   st.subheader("💧 処方組成（水層・油層の量）の入力")
   col_w1, col_w2 = st.columns(2)
   with col_w1:
-    water_amount = st.number_input(
-        "水層の量 (g または mL)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=float(st.session_state.sub_water_val),
-        step=1.0,
-        key="sub_water",
-    )
+    none_water = st.checkbox("データなし", key="chk_sub_water")
+    if none_water:
+      water_amount = 0.0
+      st.number_input(
+          "水層の量 (g または mL)",
+          value=0.0,
+          disabled=True,
+          key="sub_water_dis",
+      )
+    else:
+      water_amount = st.number_input(
+          "水層の量 (g または mL)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=80.0,
+          step=1.0,
+          key="sub_water",
+      )
   with col_w2:
-    oil_amount = st.number_input(
-        "油層の量 (g または mL)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=float(st.session_state.sub_oil_val),
-        step=1.0,
-        key="sub_oil",
-    )
+    none_oil = st.checkbox("データなし", key="chk_sub_oil")
+    if none_oil:
+      oil_amount = 0.0
+      st.number_input(
+          "油層の量 (g または mL)",
+          value=0.0,
+          disabled=True,
+          key="sub_oil_dis",
+      )
+    else:
+      oil_amount = st.number_input(
+          "油層の量 (g または mL)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=20.0,
+          step=1.0,
+          key="sub_oil",
+      )
 
   total_amount = water_amount + oil_amount
   oil_ratio = (
@@ -258,14 +254,25 @@ with tab1:
         step=1.0,
         key="sub_temp",
     )
-    initial_d50 = st.number_input(
-        "製造直後の初期 平均粒径 (nm)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=float(st.session_state.sub_init_val),
-        step=10.0,
-        key="sub_init_d50",
-    )
+
+    none_init = st.checkbox("データなし", key="chk_sub_init")
+    if none_init:
+      initial_d50 = 0.0
+      st.number_input(
+          "製造直後の初期 平均粒径 (nm)",
+          value=0.0,
+          disabled=True,
+          key="sub_init_dis",
+      )
+    else:
+      initial_d50 = st.number_input(
+          "製造直後の初期 平均粒径 (nm)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=200.0,
+          step=10.0,
+          key="sub_init_d50",
+      )
 
     st.markdown("---")
     st.markdown("#### 山1（第1ピーク）の範囲と面積比")
@@ -292,15 +299,26 @@ with tab1:
         format="%.1f",
         key="sub_p1_ratio",
     )
-    coarse_ratio = st.number_input(
-        "粗大粒子割合（1 μm以上の積分比 %）",
-        min_value=0.0,
-        max_value=100.0,
-        value=float(st.session_state.sub_coarse_val),
-        step=0.1,
-        format="%.1f",
-        key="sub_coarse",
-    )
+
+    none_coarse = st.checkbox("データなし", key="chk_sub_coarse")
+    if none_coarse:
+      coarse_ratio = 0.0
+      st.number_input(
+          "粗大粒子割合（1 μm以上 %）",
+          value=0.0,
+          disabled=True,
+          key="sub_coarse_dis",
+      )
+    else:
+      coarse_ratio = st.number_input(
+          "粗大粒子割合（1 μm以上の積分比 %）",
+          min_value=0.0,
+          max_value=100.0,
+          value=1.5,
+          step=0.1,
+          format="%.1f",
+          key="sub_coarse",
+      )
 
   with col_c2:
     test_days = st.number_input(
@@ -311,14 +329,25 @@ with tab1:
         step=1,
         key="sub_test_days",
     )
-    after_d50 = st.number_input(
-        "試験終了後の 平均粒径 (nm)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=float(st.session_state.sub_after_val),
-        step=10.0,
-        key="sub_after_d50",
-    )
+
+    none_after = st.checkbox("データなし", key="chk_sub_after")
+    if none_after:
+      after_d50 = 0.0
+      st.number_input(
+          "試験終了後の 平均粒径 (nm)",
+          value=0.0,
+          disabled=True,
+          key="sub_after_dis",
+      )
+    else:
+      after_d50 = st.number_input(
+          "試験終了後の 平均粒径 (nm)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=220.0,
+          step=10.0,
+          key="sub_after_d50",
+      )
 
     st.markdown("---")
     st.markdown("#### 山2（第2ピーク / 粗大・合一）の範囲と面積比")
@@ -336,15 +365,26 @@ with tab1:
         step=10.0,
         key="sub_p2_max",
     )
-    peak2_ratio = st.number_input(
-        "第2ピークの面積比 (%)",
-        min_value=0.0,
-        max_value=100.0,
-        value=float(st.session_state.sub_p2_rat_val),
-        step=0.5,
-        format="%.1f",
-        key="sub_p2_ratio",
-    )
+
+    none_p2_rat = st.checkbox("データなし", key="chk_sub_p2_rat")
+    if none_p2_rat:
+      peak2_ratio = 0.0
+      st.number_input(
+          "第2ピークの面積比 (%)",
+          value=0.0,
+          disabled=True,
+          key="sub_p2_rat_dis",
+      )
+    else:
+      peak2_ratio = st.number_input(
+          "第2ピークの面積比 (%)",
+          min_value=0.0,
+          max_value=100.0,
+          value=5.0,
+          step=0.5,
+          format="%.1f",
+          key="sub_p2_ratio",
+      )
 
   delta_d50 = after_d50 - initial_d50
   st.info(
@@ -352,21 +392,35 @@ with tab1:
       f" {peak2_ratio}%"
   )
 
-  turbidity = st.number_input(
-      "濁度 (吸光度など)",
-      min_value=0.0,
-      max_value=10.0,
-      value=float(st.session_state.sub_turb_val),
-      step=0.0001,
-      format="%.4f",
-      key="sub_turbidity",
-  )
+  none_turb = st.checkbox("データなし", key="chk_sub_turb")
+  if none_turb:
+    turbidity = 0.0000
+    st.number_input(
+        "濁度 (吸光度など)", value=0.0, disabled=True, key="sub_turb_dis"
+    )
+  else:
+    turbidity = st.number_input(
+        "濁度 (吸光度など)",
+        min_value=0.0,
+        max_value=10.0,
+        value=1.0000,
+        step=0.0001,
+        format="%.4f",
+        key="sub_turbidity",
+    )
 
-  condition_memo = st.text_input(
-      "その他メモ（例: 遠心分離 3000rpm、ホモジナイザー条件など）",
-      value=str(st.session_state.sub_cond_val),
-      key="sub_condition",
-  )
+  none_cond = st.checkbox("データなし", key="chk_sub_cond")
+  if none_cond:
+    condition_memo = "データなし"
+    st.text_input(
+        "その他メモ", value="データなし", disabled=True, key="sub_cond_dis"
+    )
+  else:
+    condition_memo = st.text_input(
+        "その他メモ（例: 遠心分離 3000rpm、ホモジナイザー条件など）",
+        value="",
+        key="sub_condition",
+    )
 
   stability = st.radio(
       "9か月以内の安定性",
@@ -467,34 +521,7 @@ with tab1:
 # --- 2. 予測・確認タブ ---
 with tab2:
   st.header("AIによる安定性予測・ダイナミクス診断")
-  st.markdown("未測定項目がある場合は「データなし」をセットして予測できます。")
-
-  # 予測用のデータなし一括セット用セッションステート
-  if "pred_init_val" not in st.session_state:
-    st.session_state.pred_init_val = 200.0
-  if "pred_after_val" not in st.session_state:
-    st.session_state.pred_after_val = 220.0
-  if "pred_coarse_val" not in st.session_state:
-    st.session_state.pred_coarse_val = 1.5
-  if "pred_p2_rat_val" not in st.session_state:
-    st.session_state.pred_p2_rat_val = 5.0
-  if "pred_water_val" not in st.session_state:
-    st.session_state.pred_water_val = 80.0
-  if "pred_oil_val" not in st.session_state:
-    st.session_state.pred_oil_val = 20.0
-  if "pred_turb_val" not in st.session_state:
-    st.session_state.pred_turb_val = 1.0000
-
-  if st.button("📥 予測項目の未測定部分に「データなし」をセット", key="btn_pred_none"):
-    st.session_state.pred_init_val = 0.0
-    st.session_state.pred_after_val = 0.0
-    st.session_state.pred_coarse_val = 0.0
-    st.session_state.pred_p2_rat_val = 0.0
-    st.session_state.pred_water_val = 0.0
-    st.session_state.pred_oil_val = 0.0
-    st.session_state.pred_turb_val = 0.0000
-    st.success("予測項目の未測定部分に「データなし（0）」をセットしました！")
-    st.rerun()
+  st.markdown("未測定項目は「データなし」にチェックを入れて予測できます。")
 
   pred_emulsifier = st.selectbox(
       "評価する乳化剤を選択",
@@ -505,23 +532,37 @@ with tab2:
   st.subheader("💧 予測時の処方組成（水層・油層の量）の入力")
   col_pw1, col_pw2 = st.columns(2)
   with col_pw1:
-    pred_water = st.number_input(
-        "予測時の水層の量 (g または mL)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=float(st.session_state.pred_water_val),
-        step=1.0,
-        key="pred_water",
-    )
+    none_p_water = st.checkbox("データなし", key="chk_pred_water")
+    if none_p_water:
+      pred_water = 0.0
+      st.number_input(
+          "予測時の水層の量 (g)", value=0.0, disabled=True, key="pred_water_dis"
+      )
+    else:
+      pred_water = st.number_input(
+          "予測時の水層の量 (g または mL)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=80.0,
+          step=1.0,
+          key="pred_water",
+      )
   with col_pw2:
-    pred_oil = st.number_input(
-        "予測時の油層の量 (g または mL)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=float(st.session_state.pred_oil_val),
-        step=1.0,
-        key="pred_oil",
-    )
+    none_p_oil = st.checkbox("データなし", key="chk_pred_oil")
+    if none_p_oil:
+      pred_oil = 0.0
+      st.number_input(
+          "予測時の油層の量 (g)", value=0.0, disabled=True, key="pred_oil_dis"
+      )
+    else:
+      pred_oil = st.number_input(
+          "予測時の油層の量 (g または mL)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=20.0,
+          step=1.0,
+          key="pred_oil",
+      )
 
   pred_total = pred_water + pred_oil
   pred_oil_ratio = (
@@ -537,14 +578,25 @@ with tab2:
     pred_temp = st.number_input(
         "予測時の試験 温度 (℃)", value=60.0, key="pred_temp"
     )
-    pred_init_d50 = st.number_input(
-        "予測時の初期 平均粒径 (nm)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=float(st.session_state.pred_init_val),
-        step=10.0,
-        key="pred_init_d50",
-    )
+
+    none_p_init = st.checkbox("データなし", key="chk_pred_init")
+    if none_p_init:
+      pred_init_d50 = 0.0
+      st.number_input(
+          "予測時の初期 平均粒径 (nm)",
+          value=0.0,
+          disabled=True,
+          key="pred_init_dis",
+      )
+    else:
+      pred_init_d50 = st.number_input(
+          "予測時の初期 平均粒径 (nm)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=200.0,
+          step=10.0,
+          key="pred_init_d50",
+      )
 
     st.markdown("---")
     st.markdown("#### 予測時 山1（第1ピーク）の範囲と面積比")
@@ -571,28 +623,50 @@ with tab2:
         format="%.1f",
         key="pred_p1_ratio",
     )
-    pred_coarse = st.number_input(
-        "予測時の粗大粒子割合（1 μm以上 %）",
-        min_value=0.0,
-        max_value=100.0,
-        value=float(st.session_state.pred_coarse_val),
-        step=0.1,
-        format="%.1f",
-        key="pred_coarse",
-    )
+
+    none_p_coarse = st.checkbox("データなし", key="chk_pred_coarse")
+    if none_p_coarse:
+      pred_coarse = 0.0
+      st.number_input(
+          "予測時の粗大粒子割合",
+          value=0.0,
+          disabled=True,
+          key="pred_coarse_dis",
+      )
+    else:
+      pred_coarse = st.number_input(
+          "予測時の粗大粒子割合（1 μm以上 %）",
+          min_value=0.0,
+          max_value=100.0,
+          value=1.5,
+          step=0.1,
+          format="%.1f",
+          key="pred_coarse",
+      )
 
   with col_p2:
     pred_test_days = st.number_input(
         "予測時の試験 期間 (日)", value=14, key="pred_test_days"
     )
-    pred_after_d50 = st.number_input(
-        "予測時の試験後 平均粒径 (nm)",
-        min_value=0.0,
-        max_value=10000.0,
-        value=float(st.session_state.pred_after_val),
-        step=10.0,
-        key="pred_after_d50",
-    )
+
+    none_p_after = st.checkbox("データなし", key="chk_pred_after")
+    if none_p_after:
+      pred_after_d50 = 0.0
+      st.number_input(
+          "予測時の試験後 平均粒径 (nm)",
+          value=0.0,
+          disabled=True,
+          key="pred_after_dis",
+      )
+    else:
+      pred_after_d50 = st.number_input(
+          "予測時の試験後 平均粒径 (nm)",
+          min_value=0.0,
+          max_value=10000.0,
+          value=220.0,
+          step=10.0,
+          key="pred_after_d50",
+      )
 
     st.markdown("---")
     st.markdown("#### 予測時 山2（第2ピーク）の範囲と面積比")
@@ -610,29 +684,49 @@ with tab2:
         step=10.0,
         key="pred_p2_max",
     )
-    pred_p2_ratio = st.number_input(
-        "第2ピークの面積比 (%)",
-        min_value=0.0,
-        max_value=100.0,
-        value=float(st.session_state.pred_p2_rat_val),
-        step=0.5,
-        format="%.1f",
-        key="pred_p2_ratio",
-    )
 
-  pred_delta_d50 = pred_after_d50 - pred_init_d50
+    none_p_p2_rat = st.checkbox("データなし", key="chk_pred_p2_rat")
+    if none_p_p2_rat:
+      pred_p2_ratio = 0.0
+      st.number_input(
+          "第2ピーク面積比 (%)",
+          value=0.0,
+          disabled=True,
+          key="pred_p2_rat_dis",
+      )
+    else:
+      pred_p2_ratio = st.number_input(
+          "第2ピークの面積比 (%)",
+          min_value=0.0,
+          max_value=100.0,
+          value=5.0,
+          step=0.5,
+          format="%.1f",
+          key="pred_p2_ratio",
+      )
+
+  pred_delta_d50 = (
+      pred_after_d50 - pred_init_d50
+      if not none_p_after and not none_p_init
+      else 0.0
+  )
   st.info(
       f"📈 **予測時 ΔD50**: {pred_delta_d50:+.1f} nm | **油分率**: "
       f"{pred_oil_ratio:.1f}% | **第2ピーク比率**: {pred_p2_ratio}%"
   )
 
-  pred_turbidity = st.number_input(
-      "測定された 濁度",
-      value=float(st.session_state.pred_turb_val),
-      step=0.0001,
-      format="%.4f",
-      key="pred_turbidity",
-  )
+  none_p_turb = st.checkbox("データなし", key="chk_pred_turb")
+  if none_p_turb:
+    pred_turbidity = 0.0000
+    st.number_input("濁度", value=0.0, disabled=True, key="pred_turb_dis")
+  else:
+    pred_turbidity = st.number_input(
+        "測定された 濁度",
+        value=1.0000,
+        step=0.0001,
+        format="%.4f",
+        key="pred_turbidity",
+    )
 
   pred_file = st.file_uploader(
       "📸 確認用コロイドの顕微鏡写真をアップロード（またはスマホカメラで撮影）",
@@ -657,7 +751,8 @@ with tab2:
               "てください。"
           )
         else:
-          feature_cols = [
+          # --- ★「データなし（0）」の項目をAIの学習・予測から自動除外する仕組み ---
+          base_feature_cols = [
               "oil_ratio",
               "water_amount",
               "oil_amount",
@@ -680,104 +775,132 @@ with tab2:
               "test_days",
               "turbidity",
           ]
-          for col in feature_cols:
+
+          # 予測時にユーザーが「データなし（0）」にした項目は特徴量から除外する
+          active_feature_cols = []
+          pred_values = []
+
+          # 各入力とフラグの対応チェック
+          val_map = {
+              "oil_ratio": pred_oil_ratio,
+              "water_amount": 0.0 if none_p_water else pred_water,
+              "oil_amount": 0.0 if none_p_oil else pred_oil,
+              "delta_d50": pred_delta_d50,
+              "initial_d50": 0.0 if none_p_init else pred_init_d50,
+              "after_d50": 0.0 if none_p_after else pred_after_d50,
+              "coarse_ratio": 0.0 if none_p_coarse else pred_coarse,
+              "peak1_min": pred_p1_min,
+              "peak1_max": pred_p1_max,
+              "peak1_ratio": pred_p1_ratio,
+              "peak2_min": pred_p2_min,
+              "peak2_max": pred_p2_max,
+              "peak2_ratio": 0.0 if none_p_p2_rat else pred_p2_ratio,
+              "temperature": pred_temp,
+              "test_days": pred_test_days,
+              "turbidity": 0.0 if none_p_turb else pred_turbidity,
+          }
+
+          p_count, m_area, m_circ, p_mean, p_std = (
+              extract_advanced_image_features(pred_file)
+          )
+          img_map = {
+              "particle_count": p_count,
+              "mean_area": m_area,
+              "circularity": m_circ,
+              "img_mean": p_mean,
+              "img_std": p_std,
+          }
+          val_map.update(img_map)
+
+          # 0ではない（＝データがある）項目だけをAIの学習・予測に使用する
+          for col in base_feature_cols:
+            if col in train_df.columns:
+              # 履歴データ側で0でない、かつ予測入力側でも有効な数値の項目を採用
+              if val_map[col] != 0.0 or col in [
+                  "temperature",
+                  "test_days",
+                  "oil_ratio",
+              ]:
+                active_feature_cols.append(col)
+
+          if len(active_feature_cols) < 2:
+            active_feature_cols = ["temperature", "test_days", "oil_ratio"]
+
+          for col in active_feature_cols:
             if col not in train_df.columns:
               train_df[col] = 0.0
 
-          train_clean = train_df.dropna(subset=feature_cols + ["is_stable"])
+          train_clean = train_df.dropna(
+              subset=active_feature_cols + ["is_stable"]
+          )
 
           if len(train_clean) < 2:
-            st.error(
-                "十分なパラメータ付き学習データがありません（2件以上必要です"
-                "）。"
-            )
+            train_clean = train_df.dropna(subset=["is_stable"])
+            active_feature_cols = [
+                c
+                for c in ["temperature", "test_days", "oil_ratio"]
+                if c in train_clean.columns
+            ]
+
+          X = train_clean[active_feature_cols]
+          y_class = train_clean["is_stable"]
+
+          model = RandomForestClassifier(n_estimators=10, random_state=42)
+          model.fit(X, y_class)
+
+          X_pred = np.array([[val_map[col] for col in active_feature_cols]])
+
+          prediction = model.predict(X_pred)[0]
+          proba = model.predict_proba(X_pred)[0]
+          confidence = max(proba) * 100
+
+          st.subheader("📊 AIの判定結果")
+
+          if prediction == 1:
+            st.success(f"判定：**9か月間安定**（予測確信度: {confidence:.1f}%）")
+            st.balloons()
           else:
-            X = train_clean[feature_cols]
-            y_class = train_clean["is_stable"]
-
-            model = RandomForestClassifier(n_estimators=10, random_state=42)
-            model.fit(X, y_class)
-
-            p_count, m_area, m_circ, p_mean, p_std = (
-                extract_advanced_image_features(pred_file)
+            unstable_subset = train_clean[train_clean["is_stable"] == 0]
+            avg_unstable_days = (
+                int(unstable_subset["days"].mean())
+                if len(unstable_subset) > 0 and "days" in unstable_subset
+                else 30
             )
-            X_pred = np.array([[
-                pred_oil_ratio,
-                pred_water,
-                pred_oil,
-                pred_delta_d50,
-                pred_init_d50,
-                pred_after_d50,
-                pred_coarse,
-                pred_p1_min,
-                pred_p1_max,
-                pred_p1_ratio,
-                pred_p2_min,
-                pred_p2_max,
-                pred_p2_ratio,
-                p_count,
-                m_area,
-                m_circ,
-                p_mean,
-                p_std,
-                pred_temp,
-                pred_test_days,
-                pred_turbidity,
-            ]])
 
-            prediction = model.predict(X_pred)[0]
-            proba = model.predict_proba(X_pred)[0]
-            confidence = max(proba) * 100
-
-            st.subheader("📊 AIの判定結果")
-
-            if prediction == 1:
-              st.success(
-                  f"判定：**9か月間安定**（予測確信度: {confidence:.1f}%）"
-              )
-              st.balloons()
-            else:
-              unstable_subset = train_clean[train_clean["is_stable"] == 0]
-              avg_unstable_days = (
-                  int(unstable_subset["days"].mean())
-                  if len(unstable_subset) > 0 and "days" in unstable_subset
-                  else 30
-              )
-
-              st.error(
-                  f"🚨 【リスクアラート発令】 9か月以内に不安定化・分離の恐れあり"
-                  f"（予測確信度: {confidence:.1f}%）"
-              )
-              st.warning(
-                  f"⚠️ **寿命予測の注意喚起**: 過去データ傾向から推測して、約"
-                  f" **{avg_unstable_days} 日前後** で破綻する恐れがあります。"
-              )
-
-              st.info("🤖 **AIからの改善ヒント・アドバイス**")
-              advice_list = []
-              if pred_oil_ratio > 40.0:
-                advice_list.append(
-                    "・**油分率が高めの処方です**：乳化剤の増量を推奨します。"
-                )
-              if pred_p2_ratio > 3.0:
-                advice_list.append("・**第2ピーク比率が高めです**。")
-              if pred_delta_d50 > 30:
-                advice_list.append("・**粒径変動スピードが大きい**です。")
-              if not advice_list:
-                advice_list.append("・処方の再検討をおすすめします。")
-
-              for advice in advice_list:
-                st.write(advice)
-
-            st.subheader("💡 判定の理由と指標")
-            st.write(
-                f"- **乳化剤**: {pred_emulsifier} （学習データ数:"
-                f" {len(train_clean)}件）"
+            st.error(
+                f"🚨 【リスクアラート発令】 9か月以内に不安定化・分離の恐れあり"
+                f"（予測確信度: {confidence:.1f}%）"
             )
-            st.write(
-                f"- **処方組成**: 水層 `{pred_water}g` / 油層 `{pred_oil}g` （油分率:"
-                f" `{pred_oil_ratio:.1f}%`）"
+            st.warning(
+                f"⚠️ **寿命予測の注意喚起**: 有効な測定データ傾向から推測して、約"
+                f" **{avg_unstable_days} 日前後** で破綻する恐れがあります。"
             )
+
+            st.info("🤖 **AIからの改善ヒント・アドバイス**")
+            advice_list = []
+            if not none_p_oil and pred_oil_ratio > 40.0:
+              advice_list.append(
+                  "・**油分率が高めの処方です**：乳化剤の増量を推奨します。"
+              )
+            if not none_p_p2_rat and pred_p2_ratio > 3.0:
+              advice_list.append("・**第2ピーク比率が高めです**。")
+            if not none_p_after and not none_p_init and pred_delta_d50 > 30:
+              advice_list.append("・**粒径変動スピードが大きい**です。")
+            if not advice_list:
+              advice_list.append("・処方の再検討をおすすめします。")
+
+            for advice in advice_list:
+              st.write(advice)
+
+          st.subheader("💡 判定の理由と使用された有効指標")
+          st.write(
+              f"- **乳化剤**: {pred_emulsifier} （学習データ数:"
+              f" {len(train_clean)}件）"
+          )
+          st.write(
+              f"- **AIが使用した有効パラメータ数**: {len(active_feature_cols)}個"
+              "（未測定項目は除外済み）"
+          )
     else:
       st.warning("確認用の写真をアップロードまたは撮影してください。")
 
