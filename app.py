@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（水油比率・ピーク範囲指定解析対応）"
+    "🧪 乳化安定性 予測AIアシスタント（データなし一括入力・ダイナミクス解析対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>水油比率の自動計算、ピーク範囲指定、ΔD50変化量から相分離予兆を高精度に診断します。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>データなし項目にも対応し、水油比率・ピーク範囲・ΔD50変化量から相分離予兆を高精度に診断します。</p>",
     unsafe_allow_html=True,
 )
 
@@ -157,12 +157,49 @@ def extract_advanced_image_features(image_file):
     return 0.0, 0.0, 0.0, 0.0, 0.0
 
 
+# --- セッションステート初期化（データなし機能用） ---
+if "sub_init_val" not in st.session_state:
+  st.session_state.sub_init_val = 200.0
+if "sub_after_val" not in st.session_state:
+  st.session_state.sub_after_val = 220.0
+if "sub_coarse_val" not in st.session_state:
+  st.session_state.sub_coarse_val = 1.5
+if "sub_p2_rat_val" not in st.session_state:
+  st.session_state.sub_p2_rat_val = 5.0
+if "sub_water_val" not in st.session_state:
+  st.session_state.sub_water_val = 80.0
+if "sub_oil_val" not in st.session_state:
+  st.session_state.sub_oil_val = 20.0
+if "sub_turb_val" not in st.session_state:
+  st.session_state.sub_turb_val = 1.0000
+if "sub_pres_val" not in st.session_state:
+  st.session_state.sub_pres_val = "FORM-001"
+if "sub_cond_val" not in st.session_state:
+  st.session_state.sub_cond_val = ""
+
+
 # --- 1. データ提出タブ ---
 with tab1:
-  st.header("実験データの提出（水油比率・ピーク範囲対応）")
+  st.header("実験データの提出（データなし対応）")
   st.markdown(
-      "水層・油層の量から自動計算される油分率に加え、粒度分布やダイナミクスを登録します。"
+      "未測定の項目がある場合は「データなし一括入力ボタン」をご利用ください。"
   )
+
+  # データなし一括セットボタン
+  if st.button("📥 全未測定項目に「データなし」をセット", key="btn_sub_none"):
+    st.session_state.sub_init_val = 0.0
+    st.session_state.sub_after_val = 0.0
+    st.session_state.sub_coarse_val = 0.0
+    st.session_state.sub_p2_rat_val = 0.0
+    st.session_state.sub_water_val = 0.0
+    st.session_state.sub_oil_val = 0.0
+    st.session_state.sub_turb_val = 0.0000
+    st.session_state.sub_pres_val = "データなし"
+    st.session_state.sub_cond_val = "データなし"
+    st.success(
+        "未測定の項目に「データなし（0 / データなし）」をセットしました！"
+    )
+    st.rerun()
 
   submit_date = st.date_input(
       "実験・提出日", datetime.date.today(), key="sub_date"
@@ -170,6 +207,7 @@ with tab1:
 
   prescription_no = st.text_input(
       "処方番号・派生メモ（例: FORM-001, F200-40℃ など）",
+      value=st.session_state.sub_pres_val,
       key="sub_prescription",
   )
 
@@ -186,7 +224,7 @@ with tab1:
         "水層の量 (g または mL)",
         min_value=0.0,
         max_value=10000.0,
-        value=80.0,
+        value=float(st.session_state.sub_water_val),
         step=1.0,
         key="sub_water",
     )
@@ -195,7 +233,7 @@ with tab1:
         "油層の量 (g または mL)",
         min_value=0.0,
         max_value=10000.0,
-        value=20.0,
+        value=float(st.session_state.sub_oil_val),
         step=1.0,
         key="sub_oil",
     )
@@ -224,7 +262,7 @@ with tab1:
         "製造直後の初期 平均粒径 (nm)",
         min_value=0.0,
         max_value=10000.0,
-        value=200.0,
+        value=float(st.session_state.sub_init_val),
         step=10.0,
         key="sub_init_d50",
     )
@@ -254,6 +292,15 @@ with tab1:
         format="%.1f",
         key="sub_p1_ratio",
     )
+    coarse_ratio = st.number_input(
+        "粗大粒子割合（1 μm以上の積分比 %）",
+        min_value=0.0,
+        max_value=100.0,
+        value=float(st.session_state.sub_coarse_val),
+        step=0.1,
+        format="%.1f",
+        key="sub_coarse",
+    )
 
   with col_c2:
     test_days = st.number_input(
@@ -268,7 +315,7 @@ with tab1:
         "試験終了後の 平均粒径 (nm)",
         min_value=0.0,
         max_value=10000.0,
-        value=220.0,
+        value=float(st.session_state.sub_after_val),
         step=10.0,
         key="sub_after_d50",
     )
@@ -293,7 +340,7 @@ with tab1:
         "第2ピークの面積比 (%)",
         min_value=0.0,
         max_value=100.0,
-        value=5.0,
+        value=float(st.session_state.sub_p2_rat_val),
         step=0.5,
         format="%.1f",
         key="sub_p2_ratio",
@@ -309,7 +356,7 @@ with tab1:
       "濁度 (吸光度など)",
       min_value=0.0,
       max_value=10.0,
-      value=1.0000,
+      value=float(st.session_state.sub_turb_val),
       step=0.0001,
       format="%.4f",
       key="sub_turbidity",
@@ -317,6 +364,7 @@ with tab1:
 
   condition_memo = st.text_input(
       "その他メモ（例: 遠心分離 3000rpm、ホモジナイザー条件など）",
+      value=str(st.session_state.sub_cond_val),
       key="sub_condition",
   )
 
@@ -379,6 +427,7 @@ with tab1:
           "initial_d50": initial_d50,
           "after_d50": after_d50,
           "delta_d50": delta_d50,
+          "coarse_ratio": coarse_ratio,
           "peak1_min": peak1_min,
           "peak1_max": peak1_max,
           "peak1_ratio": peak1_ratio,
@@ -411,20 +460,41 @@ with tab1:
       df["prescription_no"] = df["prescription_no"].astype(str)
       df["condition"] = df["condition"].astype(str)
       df.to_csv(DATA_FILE, index=False)
-      st.success(
-          "データを正常に保存しました！ 油分率: "
-          f"{oil_ratio:.1f}%（水 {water_amount}g / 油 {oil_amount}g）、ΔD50:"
-          f" {delta_d50:+.1f}nm の登録が完了しました。"
-      )
+      st.success("データを正常に保存しました！")
     else:
       st.warning("写真をアップロードまたは撮影してください。")
 
 # --- 2. 予測・確認タブ ---
 with tab2:
-  st.header("AIによる安定性予測・油分率ダイナミクス診断")
-  st.markdown(
-      "水層・油層量から算出される油分率やピーク範囲、変化量から、AIが分離リスクを高精度に診断します。"
-  )
+  st.header("AIによる安定性予測・ダイナミクス診断")
+  st.markdown("未測定項目がある場合は「データなし」をセットして予測できます。")
+
+  # 予測用のデータなし一括セット用セッションステート
+  if "pred_init_val" not in st.session_state:
+    st.session_state.pred_init_val = 200.0
+  if "pred_after_val" not in st.session_state:
+    st.session_state.pred_after_val = 220.0
+  if "pred_coarse_val" not in st.session_state:
+    st.session_state.pred_coarse_val = 1.5
+  if "pred_p2_rat_val" not in st.session_state:
+    st.session_state.pred_p2_rat_val = 5.0
+  if "pred_water_val" not in st.session_state:
+    st.session_state.pred_water_val = 80.0
+  if "pred_oil_val" not in st.session_state:
+    st.session_state.pred_oil_val = 20.0
+  if "pred_turb_val" not in st.session_state:
+    st.session_state.pred_turb_val = 1.0000
+
+  if st.button("📥 予測項目の未測定部分に「データなし」をセット", key="btn_pred_none"):
+    st.session_state.pred_init_val = 0.0
+    st.session_state.pred_after_val = 0.0
+    st.session_state.pred_coarse_val = 0.0
+    st.session_state.pred_p2_rat_val = 0.0
+    st.session_state.pred_water_val = 0.0
+    st.session_state.pred_oil_val = 0.0
+    st.session_state.pred_turb_val = 0.0000
+    st.success("予測項目の未測定部分に「データなし（0）」をセットしました！")
+    st.rerun()
 
   pred_emulsifier = st.selectbox(
       "評価する乳化剤を選択",
@@ -439,7 +509,7 @@ with tab2:
         "予測時の水層の量 (g または mL)",
         min_value=0.0,
         max_value=10000.0,
-        value=80.0,
+        value=float(st.session_state.pred_water_val),
         step=1.0,
         key="pred_water",
     )
@@ -448,7 +518,7 @@ with tab2:
         "予測時の油層の量 (g または mL)",
         min_value=0.0,
         max_value=10000.0,
-        value=20.0,
+        value=float(st.session_state.pred_oil_val),
         step=1.0,
         key="pred_oil",
     )
@@ -468,7 +538,12 @@ with tab2:
         "予測時の試験 温度 (℃)", value=60.0, key="pred_temp"
     )
     pred_init_d50 = st.number_input(
-        "予測時の初期 平均粒径 (nm)", value=200.0, key="pred_init_d50"
+        "予測時の初期 平均粒径 (nm)",
+        min_value=0.0,
+        max_value=10000.0,
+        value=float(st.session_state.pred_init_val),
+        step=10.0,
+        key="pred_init_d50",
     )
 
     st.markdown("---")
@@ -496,13 +571,27 @@ with tab2:
         format="%.1f",
         key="pred_p1_ratio",
     )
+    pred_coarse = st.number_input(
+        "予測時の粗大粒子割合（1 μm以上 %）",
+        min_value=0.0,
+        max_value=100.0,
+        value=float(st.session_state.pred_coarse_val),
+        step=0.1,
+        format="%.1f",
+        key="pred_coarse",
+    )
 
   with col_p2:
     pred_test_days = st.number_input(
         "予測時の試験 期間 (日)", value=14, key="pred_test_days"
     )
     pred_after_d50 = st.number_input(
-        "予測時の試験後 平均粒径 (nm)", value=220.0, key="pred_after_d50"
+        "予測時の試験後 平均粒径 (nm)",
+        min_value=0.0,
+        max_value=10000.0,
+        value=float(st.session_state.pred_after_val),
+        step=10.0,
+        key="pred_after_d50",
     )
 
     st.markdown("---")
@@ -525,7 +614,7 @@ with tab2:
         "第2ピークの面積比 (%)",
         min_value=0.0,
         max_value=100.0,
-        value=5.0,
+        value=float(st.session_state.pred_p2_rat_val),
         step=0.5,
         format="%.1f",
         key="pred_p2_ratio",
@@ -539,7 +628,7 @@ with tab2:
 
   pred_turbidity = st.number_input(
       "測定された 濁度",
-      value=1.0000,
+      value=float(st.session_state.pred_turb_val),
       step=0.0001,
       format="%.4f",
       key="pred_turbidity",
@@ -575,6 +664,7 @@ with tab2:
               "delta_d50",
               "initial_d50",
               "after_d50",
+              "coarse_ratio",
               "peak1_min",
               "peak1_max",
               "peak1_ratio",
@@ -618,6 +708,7 @@ with tab2:
                 pred_delta_d50,
                 pred_init_d50,
                 pred_after_d50,
+                pred_coarse,
                 pred_p1_min,
                 pred_p1_max,
                 pred_p1_ratio,
@@ -658,34 +749,27 @@ with tab2:
                   f"（予測確信度: {confidence:.1f}%）"
               )
               st.warning(
-                  f"⚠️ **寿命予測の注意喚起**: 油分率（{pred_oil_ratio:.1f}%）や"
-                  f"第2ピーク範囲の面積比、粒径変化スピードの傾向から推測して、過去データでは"
-                  f" **約 {avg_unstable_days} 日前後** で破綻する恐れがあります。"
+                  f"⚠️ **寿命予測の注意喚起**: 過去データ傾向から推測して、約"
+                  f" **{avg_unstable_days} 日前後** で破綻する恐れがあります。"
               )
 
               st.info("🤖 **AIからの改善ヒント・アドバイス**")
               advice_list = []
               if pred_oil_ratio > 40.0:
                 advice_list.append(
-                    "・**油分率が高めの処方です**：高内相エマルション（HIPRE）に近づいているため、界面を覆う乳化剤の絶対量が不足して合一が起きやすくなっている可能性があります。乳化剤の増量を推奨します。"
+                    "・**油分率が高めの処方です**：乳化剤の増量を推奨します。"
                 )
               if pred_p2_ratio > 3.0:
-                advice_list.append(
-                    f"・**第2ピーク（{pred_p2_min}〜{pred_p2_max}nm）の比率が {pred_p2_ratio}% と高めです**：粗大粒子の存在が相分離の引き金になります。"
-                )
+                advice_list.append("・**第2ピーク比率が高めです**。")
               if pred_delta_d50 > 30:
-                advice_list.append(
-                    "・**粒径の変動スピード（ΔD50）が大きいです**：熱ストレスに対する耐性を高める処方再検討が必要です。"
-                )
+                advice_list.append("・**粒径変動スピードが大きい**です。")
               if not advice_list:
-                advice_list.append(
-                    "・温度条件や試験期間の再確認、および他系統の乳化剤との比較をおすすめします。"
-                )
+                advice_list.append("・処方の再検討をおすすめします。")
 
               for advice in advice_list:
                 st.write(advice)
 
-            st.subheader("💡 判定の理由と処方・ピーク指標")
+            st.subheader("💡 判定の理由と指標")
             st.write(
                 f"- **乳化剤**: {pred_emulsifier} （学習データ数:"
                 f" {len(train_clean)}件）"
@@ -693,18 +777,6 @@ with tab2:
             st.write(
                 f"- **処方組成**: 水層 `{pred_water}g` / 油層 `{pred_oil}g` （油分率:"
                 f" `{pred_oil_ratio:.1f}%`）"
-            )
-            st.write(
-                f"- **第1ピーク範囲**: {pred_p1_min}〜{pred_p1_max}nm （比率:"
-                f" {pred_p1_ratio}%）"
-            )
-            st.write(
-                f"- **第2ピーク範囲**: {pred_p2_min}〜{pred_p2_max}nm （比率:"
-                f" {pred_p2_ratio}%）"
-            )
-            st.write(
-                f"- **経時変化指標**: ΔD50 `{pred_delta_d50:+.1f}nm` | 画像解析"
-                f" 粒子数 `{int(p_count)}個`"
             )
     else:
       st.warning("確認用の写真をアップロードまたは撮影してください。")
