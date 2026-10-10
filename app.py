@@ -11,7 +11,51 @@ import streamlit as st
 # データの保存先CSV
 DATA_FILE = "dataset.csv"
 
-st.title("🧪 乳化安定性 予測AIアプリ（OpenCV高度画像解析搭載）")
+# --- ページ全体のデザイン設定（ブルー＆クリーンな知的人気テーマ） ---
+st.set_page_config(
+    page_title="乳化安定性 予測AIアプリ", page_icon="🧪", layout="wide"
+)
+
+st.markdown(
+    """
+    <style>
+    /* 全体の背景やタイトルのトーン調整 */
+    .stApp {
+        background-color: #f4f7fb;
+    }
+    h1, h2, h3 {
+        color: #1e3a8a !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    /* ボタンのカスタムデザイン（落ち着いたブルー） */
+    .stButton>button {
+        background-color: #1e3a8a;
+        color: white;
+        border-radius: 6px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+    }
+    .stButton>button:hover {
+        background-color: #1d4ed8;
+        color: white;
+    }
+    /* 情報ボックスやコンテナの角丸・シャドウ */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        border-radius: 8px;
+        border-color: #cbd5e1 !important;
+        background-color: #ffffff;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
+st.title("🧪 乳化安定性 予測AIアシスタント")
+st.markdown(
+    "<p style='color: #475569; font-size: 1.1em;'>高精度な画像解析とAI予測で、界面化学・乳化処方の研究をサポートします。</p>",
+    unsafe_allow_html=True,
+)
 
 # --- パスワード認証機能 ---
 if "authenticated" not in st.session_state:
@@ -44,23 +88,19 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # --- OpenCVを用いた高度な画像解析関数 ---
 def extract_advanced_image_features(image_file):
   try:
-    # アップロードされた画像ファイルをOpenCV形式（NumPy配列）に変換
     file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
     img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
     if img_cv is None:
       return 0.0, 0.0, 0.0, 0.0, 0.0
 
-    # グレースケール変換とぼかし処理
     gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # 二値化（大津の二値化で自動しきい値処理）
     _, thresh = cv2.threshold(
         blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
     )
 
-    # 輪郭検出（粒子の抽出）
     contours, _ = cv2.findContours(
         thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
@@ -71,25 +111,20 @@ def extract_advanced_image_features(image_file):
 
     for cnt in contours:
       area = cv2.contourArea(cnt)
-      # 小さすぎるノイズや大きすぎる領域を除外
       if 10 < area < 5000:
         particle_count += 1
         areas.append(area)
         perimeter = cv2.arcLength(cnt, True)
         if perimeter > 0:
-          # 円形度計算: 4 * pi * area / (perimeter ^ 2)
           circularity = (4 * np.pi * area) / (perimeter**2)
           circularities.append(min(circularity, 1.0))
 
-    # 特徴量の集計
     mean_area = np.mean(areas) if areas else 0.0
     mean_circ = np.mean(circularities) if circularities else 0.0
     mean_brightness = np.mean(gray)
     std_brightness = np.std(gray)
 
-    # ファイルポインタを先頭に戻す（他の処理で再読み込みできるようにする）
     image_file.seek(0)
-
     return (
         float(particle_count),
         float(mean_area),
@@ -105,7 +140,8 @@ def extract_advanced_image_features(image_file):
 
 # --- 1. データ提出タブ ---
 with tab1:
-  st.header("実験データの提出（高度画像解析対応）")
+  st.header("実験データの提出")
+  st.markdown("新規試作や評価データを登録します。")
 
   submit_date = st.date_input(
       "実験・提出日", datetime.date.today(), key="sub_date"
@@ -199,12 +235,10 @@ with tab1:
 
       image_path = os.path.join(save_dir, uploaded_file.name)
 
-      # 画像保存用と解析用にファイルを分ける
       img_bytes_for_save = uploaded_file.getvalue()
       with open(image_path, "wb") as f:
         f.write(img_bytes_for_save)
 
-      # OpenCVによる高度特徴量抽出
       uploaded_file.seek(0)
       p_count, m_area, m_circ, m_bright, s_bright = (
           extract_advanced_image_features(uploaded_file)
@@ -253,11 +287,11 @@ with tab1:
     else:
       st.warning("写真をアップロードまたは撮影してください。")
 
-# --- 2. 予測・確認タブ（OpenCV解析連動） ---
+# --- 2. 予測・確認タブ ---
 with tab2:
   st.header("AIによる安定性予測・高度画像診断")
-  st.info(
-      "OpenCVが顕微鏡写真の「粒子個数・面積・円形度」を自動算出し、AIモデルが総合的に判定します。"
+  st.markdown(
+      "画像解析メトリクスと実験条件から、AIが分離リスクと改善アドバイスを提示します。"
   )
 
   pred_emulsifier = st.selectbox(
@@ -321,7 +355,6 @@ with tab2:
               "particle_size",
               "turbidity",
           ]
-          # 古いデータに新しい解析列がない場合の保険
           for col in feature_cols:
             if col not in train_df.columns:
               train_df[col] = 0.0
@@ -383,7 +416,6 @@ with tab2:
                   f" {avg_unstable_days} 日前後** で分離の兆候があります。"
               )
 
-              # AI改善アドバイス（OpenCVの円形度や粒子数も考慮）
               st.info("🤖 **AIからの改善ヒント・アドバイス**")
               advice_list = []
               if m_circ < 0.7:
@@ -420,26 +452,13 @@ with tab2:
                 f" {pred_test_days}日 / 粒径 {pred_size}nm / 濁度"
                 f" {pred_turbidity:.4f}"
             )
-
-            if m_circ < 0.75:
-              st.write(
-                  "  - ⚠️ 粒子の形が真円から崩れているため、安定性に懸念があり"
-                  "ます。"
-              )
-            else:
-              st.write(
-                  "  - ✨ 粒子がきれいな球形（高円形度）を保っており、良好な"
-                  "分散状態です。"
-              )
     else:
       st.warning("確認用の写真をアップロードまたは撮影してください。")
 
 # --- 3. データ履歴・見返しタブ ---
 with tab3:
   st.header("📁 提出データ履歴・見返し")
-  st.info(
-      "処方番号や温度タグ、OpenCV解析値を含めて履歴を確認・編集できます。（最新20件まで表示）"
-  )
+  st.markdown("過去の実験データの検索、詳細確認、編集・削除が可能です。")
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
     st.write("まだ提出されたデータはありません。")
@@ -573,97 +592,4 @@ with tab3:
                   value=float(row.get("particle_size", 200.0)),
                   key=f"edit_size_{index}",
               )
-              edit_turb = st.number_input(
-                  "濁度",
-                  value=float(row.get("turbidity", 1.0)),
-                  format="%.4f",
-                  step=0.0001,
-                  key=f"edit_turb_{index}",
-              )
-              edit_cond = st.text_input(
-                  "その他メモ",
-                  value=(
-                      str(row.get("condition", ""))
-                      if pd.notnull(row.get("condition"))
-                      else ""
-                  ),
-                  key=f"edit_cond_{index}",
-              )
-
-              if st.button("💾 変更を保存", key=f"save_edit_{index}"):
-                df["prescription_no"] = df["prescription_no"].astype(str)
-                df["condition"] = df["condition"].astype(str)
-
-                df.loc[index, "prescription_no"] = str(edit_pres)
-                df.loc[index, "temperature"] = float(edit_temp)
-                df.loc[index, "particle_size"] = float(edit_size)
-                df.loc[index, "turbidity"] = float(edit_turb)
-                df.loc[index, "condition"] = str(edit_cond)
-                df.to_csv(DATA_FILE, index=False)
-                st.success("更新しました！")
-                st.rerun()
-
-            st.write("")
-            with st.popover("✕ 削除"):
-              st.write("このデータを削除しますか？")
-              if st.button("はい、削除する", key=f"confirm_del_{index}"):
-                df = df.drop(index)
-                df.to_csv(DATA_FILE, index=False)
-                st.success("削除しました！")
-                st.rerun()
-
-# --- 4. 分析・統計（グラフ）タブ ---
-with tab4:
-  st.header("📈 実験データの分析・統計グラフ")
-  st.info(
-      "蓄積された実験データから、乳化剤ごとの傾向や、粒径・温度と安定性の関係を視覚的に確認できます。"
-  )
-
-  if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
-    st.write("まだ分析するためのデータがありません。データを登録してください。")
-  else:
-    df_stats = pd.read_csv(DATA_FILE)
-
-    if len(df_stats) < 1:
-      st.write("データが不足しています。")
-    else:
-      st.subheader("🧪 1. 乳化剤別のデータ登録数・安定傾向")
-      if "emulsifier" in df_stats.columns and "stability_text" in df_stats.columns:
-        df_stats["status_label"] = df_stats["stability_text"].apply(
-            lambda x: "安定" if str(x).startswith("安定") else "不安定"
-        )
-        counts = (
-            df_stats.groupby(["emulsifier", "status_label"])
-            .size()
-            .unstack(fill_value=0)
-        )
-        st.bar_chart(counts)
-      else:
-        st.write("集計に必要なデータ列がありません。")
-
-      st.divider()
-
-      st.subheader(
-          "🔬 2. 平均粒径と試験温度の関係（安定・不安定の分布マップ）"
-      )
-      if (
-          "temperature" in df_stats.columns
-          and "particle_size" in df_stats.columns
-      ):
-        chart_data = df_stats[
-            [
-                "temperature",
-                "particle_size",
-                "status_label",
-                "prescription_no",
-            ]
-        ]
-        st.scatter_chart(
-            chart_data,
-            x="temperature",
-            y="particle_size",
-            color="status_label",
-            size=50,
-        )
-      else:
-        st.write("散布図を描画するための数値データが不足しています。")
+              edit_turb = st.number_input
