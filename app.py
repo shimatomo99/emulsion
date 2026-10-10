@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（ベースコードまとめ & 自動枝番対応）"
+    "🧪 乳化安定性 予測AIアシスタント（名前順・日付順並び替え対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>ベースの処方コード（例: A200204C と -40℃など）をグループ化してまとめ、同名は自動で-2,-3に枝番分けします。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>ベースコードごとにグループ化し、日付順だけでなく名前順（昇順・降順）でも並び替えてデータを管理できます。</p>",
     unsafe_allow_html=True,
 )
 
@@ -161,8 +161,7 @@ def extract_advanced_image_features(image_file):
 with tab1:
   st.header("実験データの提出 & AI同時予測")
   st.markdown(
-      "新しい処方コード（例: A200204C や A200204C-40℃）を入力し、"
-      "提出と同時にAIが診断します。"
+      "新しい処方コードを入力し、提出と同時にAIが安定性を診断します。"
   )
 
   submit_date = st.date_input(
@@ -746,9 +745,8 @@ with tab2:
 with tab3:
   st.header("📁 処方グループ別データまとめ・編集")
   st.markdown(
-      "「A200204C」と「A200204C-40℃」のように、ベースコードが共通するデータは"
-      "1つのグループにまとめます。また、完全に同じ名前が重複した場合は自動で"
-      " `-2`, `-3` の枝番を振って別グループとして整理します。"
+      "ベースコードが共通するデータをまとめ、日付順または名前順で並び替えて"
+      "確認・編集できます。"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -765,9 +763,31 @@ with tab3:
     )
     st.divider()
 
-    search_query = st.text_input(
-        "🔍 処方コードで検索（例: A200204C など）", "", key="hist_search_pres"
-    )
+    # --- 検索フィルターと並び替え方法（日付順・名前順）の選択 ---
+    col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
+    with col_s1:
+      search_query = st.text_input(
+          "🔍 処方コードで検索（例: A200204C など）", "", key="hist_search_pres"
+      )
+    with col_s2:
+      sort_target = st.selectbox(
+          "🔄 並び替え基準",
+          ["日付順", "名前順（処方コード）"],
+          key="hist_sort_target",
+      )
+    with col_s3:
+      if sort_target == "日付順":
+        sort_order = st.selectbox(
+            "📅 順序",
+            ["降順（新しい順）", "昇順（古い順）"],
+            key="hist_sort_order_date",
+        )
+      else:
+        sort_order = st.selectbox(
+            "🔤 順序",
+            ["昇順（A→Z / 50音順）", "降順（Z→A）"],
+            key="hist_sort_order_name",
+        )
 
     df_display = df.copy()
     if search_query:
@@ -784,21 +804,17 @@ with tab3:
       if "prescription_no" not in df_display.columns:
         df_display["prescription_no"] = "未設定"
 
-      # --- ★ベースコード抽出 & 同名自動枝番ロジック ---
-      # 例: "A200204C-40℃" -> ハイフンやスペースの前を「ベースコード」とする
+      # --- ベースコード抽出 & 同名自動枝番ロジック ---
       base_groups = []
       for p_no in df_display["prescription_no"].astype(str):
-        # 最初のハイフンやスペースの手前をベースコードとして抽出 (例: A200204C-40℃ -> A200204C)
         base = p_no.split("-")[0].split(" ")[0].strip()
         base_groups.append(base if base else "未設定")
 
       df_display["base_prescription"] = base_groups
 
-      # 完全一致する名前が複数ある場合の「自動枝番 (-2, -3...)」の割り振り
       unique_name_counts = {}
       assigned_group_names = []
 
-      # 元のデータフレームのインデックス順にグループ名を決定
       for idx, row in df_display.iterrows():
         p_no = str(row["prescription_no"])
         if p_no not in unique_name_counts:
@@ -814,8 +830,23 @@ with tab3:
 
       df_display["display_group_name"] = assigned_group_names
 
-      # 画面表示用のグループ化（表示用グループ名ごとにまとめる）
-      grouped = df_display.groupby("display_group_name")
+      # --- 並び替え（ソート）の適用 ---
+      if sort_target == "日付順":
+        if "date" in df_display.columns:
+          df_display["date_parsed"] = pd.to_datetime(
+              df_display["date"], errors="coerce"
+          )
+          is_ascending = True if "古い順" in sort_order else False
+          df_display = df_display.sort_values(
+              by=["date_parsed", "date"], ascending=is_ascending
+          )
+      else:
+        is_ascending = True if "昇順" in sort_order else False
+        df_display = df_display.sort_values(
+            by=["display_group_name"], ascending=is_ascending
+        )
+
+      grouped = df_display.groupby("display_group_name", sort=False)
 
       st.write(
           f"グループ数: **{len(grouped)}種類** （総データ数: {len(df_display)}件）"
