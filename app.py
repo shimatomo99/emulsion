@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（ピーク面積比計算対応版）"
+    "🧪 乳化安定性 予測AIアシスタント（データ詳細参照対応版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>ピークの範囲（上りはじめ・下がり終わり：nm）とそれぞれの面積を入力し、第1/第2ピーク面積比を自動算出します。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>処方グループ別タブから各データをクリックして詳細を参照できます。</p>",
     unsafe_allow_html=True,
 )
 
@@ -359,8 +359,9 @@ with tab1:
         peak1_area_5 = st.number_input(
             "5℃ 第1ピーク 面積",
             min_value=0.0,
-            value=100.0,
-            step=1.0,
+            value=100.0000,
+            step=0.0001,
+            format="%.4f",
             key="p1_area_5",
         )
     with col_l2_5:
@@ -384,12 +385,12 @@ with tab1:
         peak2_area_5 = st.number_input(
             "5℃ 第2ピーク 面積",
             min_value=0.0,
-            value=10.0,
-            step=1.0,
+            value=10.0000,
+            step=0.0001,
+            format="%.4f",
             key="p2_area_5",
         )
 
-    # 第1ピークの面積 / 第2ピークの面積 の比率を算出
     peak_ratio_5 = (
         (peak1_area_5 / peak2_area_5)
         if peak2_area_5 > 0
@@ -477,8 +478,9 @@ with tab1:
         peak1_area_40 = st.number_input(
             "40℃ 第1ピーク 面積",
             min_value=0.0,
-            value=100.0,
-            step=1.0,
+            value=100.0000,
+            step=0.0001,
+            format="%.4f",
             key="p1_area_40",
         )
     with col_l2_40:
@@ -502,8 +504,9 @@ with tab1:
         peak2_area_40 = st.number_input(
             "40℃ 第2ピーク 面積",
             min_value=0.0,
-            value=10.0,
-            step=1.0,
+            value=10.0000,
+            step=0.0001,
+            format="%.4f",
             key="p2_area_40",
         )
 
@@ -855,7 +858,7 @@ with tab3:
   st.header("📁 処方グループ別データまとめ・編集")
   st.markdown(
       "ベースコードが共通するデータをまとめ、日付順または名前順で並び替えて"
-      "確認・編集できます。"
+      "確認・詳細参照できます。"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -965,7 +968,7 @@ with tab3:
         ):
           for index, row in group_df.iterrows():
             with st.container(border=True):
-              col1, col2, col3 = st.columns([1.2, 2.8, 0.8])
+              col1, col2, col3 = st.columns([1.2, 2.6, 1.0])
 
               with col1:
                 img_path = str(row.get("image_path", ""))
@@ -980,43 +983,82 @@ with tab3:
                   st.write("（写真なし）")
 
               with col2:
-                st.markdown(
-                    f"### 🧪 登録名/条件: {row.get('prescription_no', '')} |"
-                    f" 乳化剤: {row.get('emulsifier', '不明')}"
-                )
+                pres_title = str(row.get("prescription_no", ""))
+                emuls_name = str(row.get("emulsifier", "不明"))
+                st.markdown(f"### 🧪 {pres_title} | 乳化剤: {emuls_name}")
 
                 w_amt = row.get("water_amount", "-")
                 o_amt = row.get("oil_amount", "-")
                 o_rat = row.get("oil_ratio", 0.0)
                 d50_init = row.get("initial_d50", "-")
-                turb_init = row.get("initial_turbidity", "-")
                 d50_after = row.get("after_d50", "-")
                 d_d50 = row.get("delta_d50", 0)
-
-                d50_after_5 = row.get("after_d50_5", "-")
                 p_ratio_40 = row.get("peak_ratio_40", "-")
 
                 st.write(
                     f"📅 **提出日**: {row.get('date', '不明')}  \n"
-                    f"💧 **処方組成**: 水層 {w_amt}g / 油層 {o_amt}g （油分率:"
-                    f" {float(o_rat):.1f}%）  \n"
-                    f"🔬 **共通初期値**: 初期粒径 {d50_init}nm / 虐待前濁度"
-                    f" {turb_init}  \n"
-                    f"🔥 **40℃試験後**: {d50_after}nm (Δ:"
-                    f" {float(d_d50):+.1f}nm) / ピーク面積比(1st/2nd):"
+                    f"💧 **油分率**: {float(o_rat):.1f}% （水層 {w_amt}g / 油層"
+                    f" {o_amt}g）  \n"
+                    f"🔥 **40℃試験後粒径**: {d50_after}nm (Δ:"
+                    f" {float(d_d50):+.1f}nm) / ピーク面積比:"
                     f" {p_ratio_40}  \n"
-                    f"❄️ **5℃試験後**: {d50_after_5}nm  \n"
                     f"⚖️ **判定**: {row.get('stability_text', '')}"
                 )
-                if "不安定" in str(row.get("stability_text", "")):
-                  st.write(
-                      f"⏱️ **不安定化までの日数**: {row.get('days', '')} 日"
-                  )
-                if row.get("condition"):
-                  st.write(f"📝 **メモ**: {row.get('condition')}")
 
               with col3:
-                with st.popover("🖥️ 大画面編集"):
+                # --- クリックして詳細・参照ページを開くポップアップ/ボタン ---
+                with st.popover("📄 詳細データを参照"):
+                  st.markdown(f"### 🔍 処方データ詳細: {pres_title}")
+                  st.write(f"**登録ID**: {index}")
+                  st.write(f"**提出日**: {row.get('date', '不明')}")
+                  st.write(f"**乳化剤**: {emuls_name}")
+                  st.markdown("---")
+                  st.markdown("#### 💧 処方組成・初期値")
+                  st.write(f"- 水層の量: {row.get('water_amount', '-')}")
+                  st.write(f"- 油層の量: {row.get('oil_amount', '-')}")
+                  st.write(f"- 油分率: {row.get('oil_ratio', '-')}%")
+                  st.write(f"- 初期平均粒径: {row.get('initial_d50', '-')}")
+                  st.write(f"- 虐待前濁度: {row.get('initial_turbidity', '-')}")
+
+                  st.markdown("---")
+                  st.markdown("#### 🔥 40℃ 試験データ詳細")
+                  st.write(f"- 試験期間: {row.get('test_days', '-')}")
+                  st.write(f"- 試験後平均粒径: {row.get('after_d50', '-')}")
+                  st.write(f"- 粒径変動 (Δ): {row.get('delta_d50', '-')}")
+                  st.write(f"- 試験後濁度: {row.get('turbidity', '-')}")
+                  st.write(
+                      f"- 第1ピーク 範囲: {row.get('peak1_start', '-')}"
+                      f" 〜 {row.get('peak1_end', '-')}"
+                  )
+                  st.write(f"- 第1ピーク 面積: {row.get('peak1_area', '-')}")
+                  st.write(
+                      f"- 第2ピーク 範囲: {row.get('peak2_start', '-')}"
+                      f" 〜 {row.get('peak2_end', '-')}"
+                  )
+                  st.write(f"- 第2ピーク 面積: {row.get('peak2_area', '-')}")
+                  st.write(
+                      f"- **第1/第2ピーク面積比**: {row.get('peak_ratio_40', '-')}"
+                  )
+
+                  st.markdown("---")
+                  st.markdown("#### ❄️ 5℃ 試験データ詳細")
+                  st.write(f"- 試験後平均粒径: {row.get('after_d50_5', '-')}")
+                  st.write(f"- 試験後濁度: {row.get('turbidity_5', '-')}")
+                  st.write(
+                      f"- 第1/第2ピーク面積比: {row.get('peak_ratio_5', '-')}"
+                  )
+
+                  st.markdown("---")
+                  st.markdown("#### 📋 総合判定・メモ")
+                  st.write(f"- 安定性判定: {row.get('stability_text', '-')}")
+                  if "不安定" in str(row.get("stability_text", "")):
+                    st.write(
+                        f"- 不安定化までの日数: {row.get('days', '-')} 日"
+                    )
+                  st.write(f"- メモ: {row.get('condition', '-')}")
+
+                st.write("")
+                with st.popover("🖥️ 編集"):
                   st.write(
                       f"### ✏️ データの全項目編集 (ID: {index} / 処方:"
                       f" {row.get('prescription_no', '')})"
@@ -1130,6 +1172,8 @@ with tab3:
                     edit_p1_area_5 = st.number_input(
                         "5℃ 第1ピーク 面積",
                         value=float(row.get("peak1_area", 100.0)),
+                        format="%.4f",
+                        step=0.0001,
                         key=f"e_p1area5_{index}",
                     )
                     edit_p2_start_5 = st.number_input(
@@ -1145,6 +1189,8 @@ with tab3:
                     edit_p2_area_5 = st.number_input(
                         "5℃ 第2ピーク 面積",
                         value=float(row.get("peak2_area", 10.0)),
+                        format="%.4f",
+                        step=0.0001,
                         key=f"e_p2area5_{index}",
                     )
 
@@ -1186,6 +1232,8 @@ with tab3:
                     edit_p1_area_40 = st.number_input(
                         "40℃ 第1ピーク 面積",
                         value=float(row.get("peak1_area", 100.0)),
+                        format="%.4f",
+                        step=0.0001,
                         key=f"e_p1area40_{index}",
                     )
                     edit_p2_start_40 = st.number_input(
@@ -1201,6 +1249,8 @@ with tab3:
                     edit_p2_area_40 = st.number_input(
                         "40℃ 第2ピーク 面積",
                         value=float(row.get("peak2_area", 10.0)),
+                        format="%.4f",
+                        step=0.0001,
                         key=f"e_p2area40_{index}",
                     )
 
@@ -1240,7 +1290,6 @@ with tab3:
                         1 if edit_stability.startswith("安定") else 0
                     )
 
-                    # 再計算
                     new_pr_40 = (
                         (edit_p1_area_40 / edit_p2_area_40)
                         if edit_p2_area_40 > 0
