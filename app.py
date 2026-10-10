@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（別タブ大画面編集・全データなし対応）"
+    "🧪 乳化安定性 予測AIアシスタント（処方コード別グループ化対応）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>データ提出と同時にAI予測し、履歴画面からは別タブの大きな画面で全項目の編集・データなし切替が行えます。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>処方ごとにデータをまとめて管理・比較できます（例: A234154C 形式）。</p>",
     unsafe_allow_html=True,
 )
 
@@ -95,11 +95,11 @@ if not st.session_state.authenticated:
 
 # --- 認証成功後のメインアプリ ---
 
-# タブの切り替え（履歴画面の中に「大画面編集用タブ」を動的に追加できるように整理）
+# タブの切り替え
 tab1, tab2, tab3, tab4 = st.tabs([
     "📁 データ提出・同時予測モード",
     "🔍 個別予測・確認モード",
-    "📊 データ履歴・編集",
+    "📊 処方別データまとめ・編集",
     "📈 分析・統計（グラフ）",
 ])
 
@@ -160,7 +160,10 @@ def extract_advanced_image_features(image_file):
 # --- 1. データ提出・同時予測タブ ---
 with tab1:
   st.header("実験データの提出 & AI同時予測")
-  st.markdown("データを入力して提出ボタンを押すと、自動でAIが安定性を診断します。")
+  st.markdown(
+      "新しい処方コード（例: A234154C）を入力し、データを提出すると同時にAIが"
+      "診断します。"
+  )
 
   submit_date = st.date_input(
       "実験・提出日", datetime.date.today(), key="sub_date"
@@ -172,15 +175,12 @@ with tab1:
     if none_pres:
       prescription_no = "データなし"
       st.text_input(
-          "処方番号・派生メモ",
-          value="データなし",
-          disabled=True,
-          key="sub_prescription_dis",
+          "処方コード", value="データなし", disabled=True, key="sub_prescription_dis"
       )
     else:
       prescription_no = st.text_input(
-          "処方番号・派生メモ（例: FORM-001, F200-40℃ など）",
-          value="FORM-001",
+          "処方コード（例: A234154C）",
+          value="A234154C",
           key="sub_prescription",
       )
 
@@ -742,11 +742,12 @@ with tab2:
     else:
       st.warning("写真をアップロードしてください。")
 
-# --- 3. データ履歴・編集タブ（別タブ大画面編集対応） ---
+# --- 3. 処方別データまとめ・編集タブ ---
 with tab3:
-  st.header("📁 提出データ履歴・編集")
+  st.header("📁 処方コード別データまとめ・編集")
   st.markdown(
-      "過去の実験データの検索、詳細確認、および**別タブ大画面での全項目編集**が可能です。"
+      "提出されたデータを**処方コード（例: A234154C）ごとにグループ化**して"
+      "まとめて表示します。各処方の詳細展開や大画面での全項目編集が可能です。"
   )
 
   if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
@@ -764,27 +765,12 @@ with tab3:
     st.divider()
 
     search_query = st.text_input(
-        "🔍 処方番号・温度タグで検索（例: F200、40℃、FORM-001 など）",
+        "🔍 処方コードで検索（例: A234154C、または一部の数字など）",
         "",
         key="hist_search_pres",
     )
 
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-      filter_emulsifier = st.selectbox(
-          "乳化剤で絞り込み",
-          ["すべて", "アラビアガム", "ポリグリ", "キラヤ"],
-          key="hist_filter_emulsifier",
-      )
-    with col_f2:
-      filter_stability = st.selectbox(
-          "安定性で絞り込み",
-          ["すべて", "安定", "不安定"],
-          key="hist_filter_stability",
-      )
-
     df_display = df.copy()
-
     if search_query:
       df_display["prescription_no"] = (
           df_display["prescription_no"].astype(str).fillna("")
@@ -793,357 +779,359 @@ with tab3:
           df_display["prescription_no"].str.contains(search_query, case=False)
       ]
 
-    if filter_emulsifier != "すべて":
-      df_display = df_display[df_display["emulsifier"] == filter_emulsifier]
-
-    if filter_stability == "安定":
-      df_display = df_display[
-          df_display["stability_text"].str.startswith("安定", na=False)
-      ]
-    elif filter_stability == "不安定":
-      df_display = df_display[
-          df_display["stability_text"].str.startswith("不安定", na=False)
-      ]
-
     if len(df_display) == 0:
       st.write("該当するデータはありません。")
     else:
-      if "date" in df_display.columns:
-        df_display = df_display.sort_values(by="date", ascending=False)
+      if "prescription_no" not in df_display.columns:
+        df_display["prescription_no"] = "未設定"
 
-      total_count = len(df_display)
-      df_display = df_display.head(20)
+      # 処方コードごとにグループ化してアコード（エクスパンダー）で整理
+      prescription_groups = df_display.groupby("prescription_no")
 
       st.write(
-          f"該当件数: **{total_count}件** （うち、最新の **{len(df_display)}件**"
-          " を表示中）"
+          f"登録されている処方コード数: **{len(prescription_groups)}種類** （総データ数:"
+          f" {len(df_display)}件）"
       )
 
-      for index, row in df_display.iterrows():
-        with st.container(border=True):
-          col1, col2, col3 = st.columns([1.2, 2.8, 0.8])
+      for pres_code, group_df in prescription_groups:
+        with st.expander(
+            f"🏷️ 処方コード: {pres_code} （登録データ件数: {len(group_df)}件）",
+            expanded=True,
+        ):
+          for index, row in group_df.iterrows():
+            with st.container(border=True):
+              col1, col2, col3 = st.columns([1.2, 2.8, 0.8])
 
-          with col1:
-            img_path = str(row.get("image_path", ""))
-            if os.path.exists(img_path):
-              image = Image.open(img_path)
-              st.image(
-                  image,
-                  caption=f"撮影日: {row.get('date', '不明')}",
-                  width=140,
-              )
-            else:
-              st.write("（写真なし）")
-
-          with col2:
-            pres_no = row.get("prescription_no", "未設定")
-            st.markdown(
-                f"### 🏷️ 処方番号・タグ: {pres_no} （乳化剤:"
-                f" {row.get('emulsifier', '')}）"
-            )
-
-            w_amt = row.get("water_amount", "-")
-            o_amt = row.get("oil_amount", "-")
-            o_rat = row.get("oil_ratio", 0.0)
-            d50_init = row.get("initial_d50", "-")
-            d50_after = row.get("after_d50", "-")
-            d_d50 = row.get("delta_d50", 0)
-            p2_rat = row.get("peak2_ratio", 5.0)
-
-            st.write(
-                f"📅 **提出日**: {row.get('date', '不明')}  \n"
-                f"💧 **処方組成**: 水層 {w_amt}g / 油層 {o_amt}g （油分率:"
-                f" {float(o_rat):.1f}%）  \n"
-                f"🌡️ **試験条件**: 温度 {int(float(row.get('temperature', 40)))}℃"
-                f" / 期間 {row.get('test_days', '-')}日  \n"
-                f"📈 **ダイナミクス**: 初期 {d50_init}nm → 試験後"
-                f" {d50_after}nm (ΔD50: {float(d_d50):+.1f}nm)  \n"
-                f"📊 **第2ピーク比率**: {float(p2_rat)}%  \n"
-                f"⚖️ **判定**: {row.get('stability_text', '')}"
-            )
-            if "不安定" in str(row.get("stability_text", "")):
-              st.write(f"⏱️ **不安定化までの日数**: {row.get('days', '')} 日")
-            if row.get("condition"):
-              st.write(f"📝 **メモ**: {row.get('condition')}")
-
-          with col3:
-            # --- ★別タブ大画面で編集できるモーダル・リンク機能 ---
-            with st.popover("🖥️ 大画面編集"):
-              st.write(
-                  f"### ✏️ データの全項目編集 (ID: {index} / 処方: {pres_no})"
-              )
-              st.markdown(
-                  "すべてのパラメータおよび個別「データなし」設定を変更できます。"
-              )
-
-              # 処方番号
-              edit_pres = st.text_input(
-                  "処方番号・タグ",
-                  value=str(row.get("prescription_no", "")),
-                  key=f"e_pres_{index}",
-              )
-
-              # 乳化剤
-              current_emulsifier = str(row.get("emulsifier", "アラビアガム"))
-              emulsifier_idx = (
-                  ["アラビアガム", "ポリグリ", "キラヤ"].index(current_emulsifier)
-                  if current_emulsifier in ["アラビアガム", "ポリグリ", "キラヤ"]
-                  else 0
-              )
-              edit_emulsifier = st.selectbox(
-                  "使用した乳化剤",
-                  ["アラビアガム", "ポリグリ", "キラヤ"],
-                  index=emulsifier_idx,
-                  key=f"e_emul_{index}",
-              )
-
-              st.markdown("---")
-              st.markdown("#### 💧 水層・油層の量 と データなし設定")
-              col_ew1, col_ew2 = st.columns(2)
-              with col_ew1:
-                e_none_water = st.checkbox(
-                    "水層：データなし", key=f"e_none_water_{index}"
-                )
-                if e_none_water:
-                  edit_water = 0.0
-                  st.text("（水層: 0.0設定）")
+              with col1:
+                img_path = str(row.get("image_path", ""))
+                if os.path.exists(img_path):
+                  image = Image.open(img_path)
+                  st.image(
+                      image,
+                      caption=f"提出日: {row.get('date', '不明')}",
+                      width=140,
+                  )
                 else:
-                  edit_water = st.number_input(
-                      "水層の量 (g)",
-                      value=float(row.get("water_amount", 80.0)),
-                      key=f"e_water_{index}",
+                  st.write("（写真なし）")
+
+              with col2:
+                st.markdown(
+                    f"### 🧪 乳化剤: {row.get('emulsifier', '不明')}"
+                )
+
+                w_amt = row.get("water_amount", "-")
+                o_amt = row.get("oil_amount", "-")
+                o_rat = row.get("oil_ratio", 0.0)
+                d50_init = row.get("initial_d50", "-")
+                d50_after = row.get("after_d50", "-")
+                d_d50 = row.get("delta_d50", 0)
+                p2_rat = row.get("peak2_ratio", 5.0)
+
+                st.write(
+                    f"📅 **提出日**: {row.get('date', '不明')}  \n"
+                    f"💧 **処方組成**: 水層 {w_amt}g / 油層 {o_amt}g （油分率:"
+                    f" {float(o_rat):.1f}%）  \n"
+                    f"🌡️ **試験条件**: 温度"
+                    f" {int(float(row.get('temperature', 40)))}℃ / 期間"
+                    f" {row.get('test_days', '-')}日  \n"
+                    f"📈 **ダイナミクス**: 初期 {d50_init}nm → 試験後"
+                    f" {d50_after}nm (ΔD50: {float(d_d50):+.1f}nm)  \n"
+                    f"📊 **第2ピーク比率**: {float(p2_rat)}%  \n"
+                    f"⚖️ **判定**: {row.get('stability_text', '')}"
+                )
+                if "不安定" in str(row.get("stability_text", "")):
+                  st.write(
+                      f"⏱️ **不安定化までの日数**: {row.get('days', '')} 日"
                   )
-              with col_ew2:
-                e_none_oil = st.checkbox(
-                    "油層：データなし", key=f"e_none_oil_{index}"
-                )
-                if e_none_oil:
-                  edit_oil = 0.0
-                  st.text("（油層: 0.0設定）")
-                else:
-                  edit_oil = st.number_input(
-                      "油層の量 (g)",
-                      value=float(row.get("oil_amount", 20.0)),
-                      key=f"e_oil_{index}",
+                if row.get("condition"):
+                  st.write(f"📝 **メモ**: {row.get('condition')}")
+
+              with col3:
+                # --- 大画面編集用ポップオーバー ---
+                with st.popover("🖥️ 大画面編集"):
+                  st.write(
+                      f"### ✏️ データの全項目編集 (ID: {index} / 処方:"
+                      f" {pres_code})"
                   )
-
-              st.markdown("---")
-              st.markdown("#### 📊 試験条件・平均粒径")
-              col_ec1, col_ec2 = st.columns(2)
-              with col_ec1:
-                cur_temp = float(row.get("temperature", 40.0))
-                edit_temp_choice = st.radio(
-                    "試験 温度",
-                    ["5℃", "40℃"],
-                    index=0 if cur_temp == 5.0 else 1,
-                    horizontal=True,
-                    key=f"e_temp_choice_{index}",
-                )
-                edit_temp = 5.0 if edit_temp_choice == "5℃" else 40.0
-
-                e_none_init = st.checkbox(
-                    "初期粒径：データなし", key=f"e_none_init_{index}"
-                )
-                if e_none_init:
-                  edit_init = 0.0
-                  st.text("（初期粒径: 0.0設定）")
-                else:
-                  edit_init = st.number_input(
-                      "初期平均粒径 (nm)",
-                      value=float(row.get("initial_d50", 200.0)),
-                      key=f"e_init_{index}",
-                  )
-
-              with col_ec2:
-                edit_test_days = st.number_input(
-                    "試験 期間 (日)",
-                    value=int(
-                        row.get("test_days", 14)
-                        if pd.notnull(row.get("test_days"))
-                        else 14
-                    ),
-                    key=f"e_days_{index}",
-                )
-
-                e_none_after = st.checkbox(
-                    "試験後粒径：データなし", key=f"e_none_after_{index}"
-                )
-                if e_none_after:
-                  edit_after = 0.0
-                  st.text("（試験後粒径: 0.0設定）")
-                else:
-                  edit_after = st.number_input(
-                      "試験後 平均粒径 (nm)",
-                      value=float(row.get("after_d50", 220.0)),
-                      key=f"e_after_{index}",
+                  st.markdown(
+                      "すべてのパラメータおよび個別「データなし」設定を変更できます。"
                   )
 
-              st.markdown("---")
-              st.markdown("#### 🔬 レーザー解析（ピーク範囲）と データなし設定")
-              col_el1, col_el2 = st.columns(2)
-              with col_el1:
-                e_none_p1 = st.checkbox(
-                    "山1（第1ピーク）：データなし", key=f"e_none_p1_{index}"
-                )
-                if e_none_p1:
-                  edit_p1_min = 0.0
-                  edit_p1_max = 0.0
-                  edit_p1_ratio = 0.0
-                  st.text("（第1ピーク: データなし）")
-                else:
-                  edit_p1_min = st.number_input(
-                      "第1ピーク 最小値 (nm)",
-                      value=float(
-                          row.get("peak1_min", 50.0)
-                          if pd.notnull(row.get("peak1_min"))
-                          else 50.0
+                  edit_pres = st.text_input(
+                      "処方コード（例: A234154C）",
+                      value=str(row.get("prescription_no", "")),
+                      key=f"e_pres_{index}",
+                  )
+
+                  current_emulsifier = str(
+                      row.get("emulsifier", "アラビアガム")
+                  )
+                  emulsifier_idx = (
+                      ["アラビアガム", "ポリグリ", "キラヤ"].index(
+                          current_emulsifier
+                      )
+                      if current_emulsifier
+                      in ["アラビアガム", "ポリグリ", "キラヤ"]
+                      else 0
+                  )
+                  edit_emulsifier = st.selectbox(
+                      "使用した乳化剤",
+                      ["アラビアガム", "ポリグリ", "キラヤ"],
+                      index=emulsifier_idx,
+                      key=f"e_emul_{index}",
+                  )
+
+                  st.markdown("---")
+                  st.markdown("#### 💧 水層・油層の量 と データなし設定")
+                  col_ew1, col_ew2 = st.columns(2)
+                  with col_ew1:
+                    e_none_water = st.checkbox(
+                        "水層：データなし", key=f"e_none_water_{index}"
+                    )
+                    if e_none_water:
+                      edit_water = 0.0
+                      st.text("（水層: 0.0設定）")
+                    else:
+                      edit_water = st.number_input(
+                          "水層の量 (g)",
+                          value=float(row.get("water_amount", 80.0)),
+                          key=f"e_water_{index}",
+                      )
+                  with col_ew2:
+                    e_none_oil = st.checkbox(
+                        "油層：データなし", key=f"e_none_oil_{index}"
+                    )
+                    if e_none_oil:
+                      edit_oil = 0.0
+                      st.text("（油層: 0.0設定）")
+                    else:
+                      edit_oil = st.number_input(
+                          "油層の量 (g)",
+                          value=float(row.get("oil_amount", 20.0)),
+                          key=f"e_oil_{index}",
+                      )
+
+                  st.markdown("---")
+                  st.markdown("#### 📊 試験条件・平均粒径")
+                  col_ec1, col_ec2 = st.columns(2)
+                  with col_ec1:
+                    cur_temp = float(row.get("temperature", 40.0))
+                    edit_temp_choice = st.radio(
+                        "試験 温度",
+                        ["5℃", "40℃"],
+                        index=0 if cur_temp == 5.0 else 1,
+                        horizontal=True,
+                        key=f"e_temp_choice_{index}",
+                    )
+                    edit_temp = 5.0 if edit_temp_choice == "5℃" else 40.0
+
+                    e_none_init = st.checkbox(
+                        "初期粒径：データなし", key=f"e_none_init_{index}"
+                    )
+                    if e_none_init:
+                      edit_init = 0.0
+                      st.text("（初期粒径: 0.0設定）")
+                    else:
+                      edit_init = st.number_input(
+                          "初期平均粒径 (nm)",
+                          value=float(row.get("initial_d50", 200.0)),
+                          key=f"e_init_{index}",
+                      )
+
+                  with col_ec2:
+                    edit_test_days = st.number_input(
+                        "試験 期間 (日)",
+                        value=int(
+                            row.get("test_days", 14)
+                            if pd.notnull(row.get("test_days"))
+                            else 14
+                        ),
+                        key=f"e_days_{index}",
+                    )
+
+                    e_none_after = st.checkbox(
+                        "試験後粒径：データなし", key=f"e_none_after_{index}"
+                    )
+                    if e_none_after:
+                      edit_after = 0.0
+                      st.text("（試験後粒径: 0.0設定）")
+                    else:
+                      edit_after = st.number_input(
+                          "試験後 平均粒径 (nm)",
+                          value=float(row.get("after_d50", 220.0)),
+                          key=f"e_after_{index}",
+                      )
+
+                  st.markdown("---")
+                  st.markdown("#### 🔬 レーザー解析（ピーク範囲）と データなし設定")
+                  col_el1, col_el2 = st.columns(2)
+                  with col_el1:
+                    e_none_p1 = st.checkbox(
+                        "山1（第1ピーク）：データなし", key=f"e_none_p1_{index}"
+                    )
+                    if e_none_p1:
+                      edit_p1_min = 0.0
+                      edit_p1_max = 0.0
+                      edit_p1_ratio = 0.0
+                      st.text("（第1ピーク: データなし）")
+                    else:
+                      edit_p1_min = st.number_input(
+                          "第1ピーク 最小値 (nm)",
+                          value=float(
+                              row.get("peak1_min", 50.0)
+                              if pd.notnull(row.get("peak1_min"))
+                              else 50.0
+                          ),
+                          key=f"e_p1min_{index}",
+                      )
+                      edit_p1_max = st.number_input(
+                          "第1ピーク 最大値 (nm)",
+                          value=float(
+                              row.get("peak1_max", 500.0)
+                              if pd.notnull(row.get("peak1_max"))
+                              else 500.0
+                          ),
+                          key=f"e_p1max_{index}",
+                      )
+                      edit_p1_ratio = st.number_input(
+                          "第1ピーク 面積比 (%)",
+                          value=float(
+                              row.get("peak1_ratio", 95.0)
+                              if pd.notnull(row.get("peak1_ratio"))
+                              else 95.0
+                          ),
+                          key=f"e_p1rat_{index}",
+                      )
+
+                  with col_el2:
+                    e_none_p2 = st.checkbox(
+                        "山2（第2ピーク）：データなし", key=f"e_none_p2_{index}"
+                    )
+                    if e_none_p2:
+                      edit_p2_min = 0.0
+                      edit_p2_max = 0.0
+                      edit_p2_ratio = 0.0
+                      st.text("（第2ピーク: データなし）")
+                    else:
+                      edit_p2_min = st.number_input(
+                          "第2ピーク 最小値 (nm)",
+                          value=float(
+                              row.get("peak2_min", 500.0)
+                              if pd.notnull(row.get("peak2_min"))
+                              else 500.0
+                          ),
+                          key=f"e_p2min_{index}",
+                      )
+                      edit_p2_max = st.number_input(
+                          "第2ピーク 最大値 (nm)",
+                          value=float(
+                              row.get("peak2_max", 5000.0)
+                              if pd.notnull(row.get("peak2_max"))
+                              else 5000.0
+                          ),
+                          key=f"e_p2max_{index}",
+                      )
+                      edit_p2_ratio = st.number_input(
+                          "第2ピーク 面積比 (%)",
+                          value=float(
+                              row.get("peak2_ratio", 5.0)
+                              if pd.notnull(row.get("peak2_ratio"))
+                              else 5.0
+                          ),
+                          key=f"e_p2rat_{index}",
+                      )
+
+                  st.markdown("---")
+                  st.markdown("#### 💧 濁度・メモ・安定性")
+                  e_none_turb = st.checkbox(
+                      "濁度：データなし", key=f"e_none_turb_{index}"
+                  )
+                  if e_none_turb:
+                    edit_turbidity = 0.0
+                    st.text("（濁度: 0.0設定）")
+                  else:
+                    edit_turbidity = st.number_input(
+                        "濁度",
+                        value=float(
+                            row.get("turbidity", 1.0)
+                            if pd.notnull(row.get("turbidity"))
+                            else 1.0
+                        ),
+                        format="%.4f",
+                        key=f"e_turb_{index}",
+                    )
+
+                  edit_cond = st.text_input(
+                      "その他メモ",
+                      value=(
+                          str(row.get("condition", ""))
+                          if pd.notnull(row.get("condition"))
+                          else ""
                       ),
-                      key=f"e_p1min_{index}",
-                  )
-                  edit_p1_max = st.number_input(
-                      "第1ピーク 最大値 (nm)",
-                      value=float(
-                          row.get("peak1_max", 500.0)
-                          if pd.notnull(row.get("peak1_max"))
-                          else 500.0
-                      ),
-                      key=f"e_p1max_{index}",
-                  )
-                  edit_p1_ratio = st.number_input(
-                      "第1ピーク 面積比 (%)",
-                      value=float(
-                          row.get("peak1_ratio", 95.0)
-                          if pd.notnull(row.get("peak1_ratio"))
-                          else 95.0
-                      ),
-                      key=f"e_p1rat_{index}",
+                      key=f"e_cond_{index}",
                   )
 
-              with col_el2:
-                e_none_p2 = st.checkbox(
-                    "山2（第2ピーク）：データなし", key=f"e_none_p2_{index}"
-                )
-                if e_none_p2:
-                  edit_p2_min = 0.0
-                  edit_p2_max = 0.0
-                  edit_p2_ratio = 0.0
-                  st.text("（第2ピーク: データなし）")
-                else:
-                  edit_p2_min = st.number_input(
-                      "第2ピーク 最小値 (nm)",
-                      value=float(
-                          row.get("peak2_min", 500.0)
-                          if pd.notnull(row.get("peak2_min"))
-                          else 500.0
-                      ),
-                      key=f"e_p2min_{index}",
-                  )
-                  edit_p2_max = st.number_input(
-                      "第2ピーク 最大値 (nm)",
-                      value=float(
-                          row.get("peak2_max", 5000.0)
-                          if pd.notnull(row.get("peak2_max"))
-                          else 5000.0
-                      ),
-                      key=f"e_p2max_{index}",
-                  )
-                  edit_p2_ratio = st.number_input(
-                      "第2ピーク 面積比 (%)",
-                      value=float(
-                          row.get("peak2_ratio", 5.0)
-                          if pd.notnull(row.get("peak2_ratio"))
-                          else 5.0
-                      ),
-                      key=f"e_p2rat_{index}",
+                  cur_stab = str(row.get("stability_text", "安定"))
+                  edit_stability = st.radio(
+                      "9か月以内の安定性",
+                      [
+                          "安定（長期間分離しない）",
+                          "不安定（9か月以内に分離・クリーミング）",
+                      ],
+                      index=0 if cur_stab.startswith("安定") else 1,
+                      key=f"e_stab_{index}",
                   )
 
-              st.markdown("---")
-              st.markdown("#### 💧 濁度・メモ・安定性")
-              e_none_turb = st.checkbox(
-                  "濁度：データなし", key=f"e_none_turb_{index}"
-              )
-              if e_none_turb:
-                edit_turbidity = 0.0
-                st.text("（濁度: 0.0設定）")
-              else:
-                edit_turbidity = st.number_input(
-                    "濁度",
-                    value=float(
-                        row.get("turbidity", 1.0)
-                        if pd.notnull(row.get("turbidity"))
-                        else 1.0
-                    ),
-                    format="%.4f",
-                    key=f"e_turb_{index}",
-                )
+                  if st.button(
+                      "💾 すべての変更を保存する", key=f"save_edit_{index}"
+                  ):
+                    df["prescription_no"] = df["prescription_no"].astype(str)
+                    df["condition"] = df["condition"].astype(str)
 
-              edit_cond = st.text_input(
-                  "その他メモ",
-                  value=(
-                      str(row.get("condition", ""))
-                      if pd.notnull(row.get("condition"))
-                      else ""
-                  ),
-                  key=f"e_cond_{index}",
-              )
+                    tot = edit_water + edit_oil
+                    new_o_rat = (edit_oil / tot * 100.0) if tot > 0 else 0.0
+                    new_delta = (
+                        edit_after - edit_init
+                        if not e_none_after and not e_none_init
+                        else 0.0
+                    )
+                    new_is_stable = (
+                        1 if edit_stability.startswith("安定") else 0
+                    )
 
-              cur_stab = str(row.get("stability_text", "安定"))
-              edit_stability = st.radio(
-                  "9か月以内の安定性",
-                  [
-                      "安定（長期間分離しない）",
-                      "不安定（9か月以内に分離・クリーミング）",
-                  ],
-                  index=0 if cur_stab.startswith("安定") else 1,
-                  key=f"e_stab_{index}",
-              )
+                    df.loc[index, "prescription_no"] = str(edit_pres)
+                    df.loc[index, "emulsifier"] = edit_emulsifier
+                    df.loc[index, "water_amount"] = float(edit_water)
+                    df.loc[index, "oil_amount"] = float(edit_oil)
+                    df.loc[index, "oil_ratio"] = float(new_o_rat)
+                    df.loc[index, "temperature"] = float(edit_temp)
+                    df.loc[index, "test_days"] = int(edit_test_days)
+                    df.loc[index, "initial_d50"] = float(edit_init)
+                    df.loc[index, "after_d50"] = float(edit_after)
+                    df.loc[index, "delta_d50"] = float(new_delta)
+                    df.loc[index, "peak1_min"] = float(edit_p1_min)
+                    df.loc[index, "peak1_max"] = float(edit_p1_max)
+                    df.loc[index, "peak1_ratio"] = float(edit_p1_ratio)
+                    df.loc[index, "peak2_min"] = float(edit_p2_min)
+                    df.loc[index, "peak2_max"] = float(edit_p2_max)
+                    df.loc[index, "peak2_ratio"] = float(edit_p2_ratio)
+                    df.loc[index, "turbidity"] = float(edit_turbidity)
+                    df.loc[index, "condition"] = str(edit_cond)
+                    df.loc[index, "stability_text"] = edit_stability
+                    df.loc[index, "is_stable"] = int(new_is_stable)
 
-              if st.button("💾 すべての変更を保存する", key=f"save_edit_{index}"):
-                df["prescription_no"] = df["prescription_no"].astype(str)
-                df["condition"] = df["condition"].astype(str)
+                    df.to_csv(DATA_FILE, index=False)
+                    st.success("すべての変更を正常に保存しました！")
+                    st.rerun()
 
-                tot = edit_water + edit_oil
-                new_o_rat = (edit_oil / tot * 100.0) if tot > 0 else 0.0
-                new_delta = (
-                    edit_after - edit_init
-                    if not e_none_after and not e_none_init
-                    else 0.0
-                )
-                new_is_stable = 1 if edit_stability.startswith("安定") else 0
-
-                df.loc[index, "prescription_no"] = str(edit_pres)
-                df.loc[index, "emulsifier"] = edit_emulsifier
-                df.loc[index, "water_amount"] = float(edit_water)
-                df.loc[index, "oil_amount"] = float(edit_oil)
-                df.loc[index, "oil_ratio"] = float(new_o_rat)
-                df.loc[index, "temperature"] = float(edit_temp)
-                df.loc[index, "test_days"] = int(edit_test_days)
-                df.loc[index, "initial_d50"] = float(edit_init)
-                df.loc[index, "after_d50"] = float(edit_after)
-                df.loc[index, "delta_d50"] = float(new_delta)
-                df.loc[index, "peak1_min"] = float(edit_p1_min)
-                df.loc[index, "peak1_max"] = float(edit_p1_max)
-                df.loc[index, "peak1_ratio"] = float(edit_p1_ratio)
-                df.loc[index, "peak2_min"] = float(edit_p2_min)
-                df.loc[index, "peak2_max"] = float(edit_p2_max)
-                df.loc[index, "peak2_ratio"] = float(edit_p2_ratio)
-                df.loc[index, "turbidity"] = float(edit_turbidity)
-                df.loc[index, "condition"] = str(edit_cond)
-                df.loc[index, "stability_text"] = edit_stability
-                df.loc[index, "is_stable"] = int(new_is_stable)
-
-                df.to_csv(DATA_FILE, index=False)
-                st.success("すべての変更を正常に保存しました！")
-                st.rerun()
-
-            st.write("")
-            with st.popover("✕ 削除"):
-              st.write("このデータを削除しますか？")
-              if st.button("はい、削除する", key=f"confirm_del_{index}"):
-                df = df.drop(index)
-                df.to_csv(DATA_FILE, index=False)
-                st.success("削除しました！")
-                st.rerun()
+                st.write("")
+                with st.popover("✕ 削除"):
+                  st.write("このデータを削除しますか？")
+                  if st.button("はい、削除する", key=f"confirm_del_{index}"):
+                    df = df.drop(index)
+                    df.to_csv(DATA_FILE, index=False)
+                    st.success("削除しました！")
+                    st.rerun()
 
 # --- 4. 分析・統計（グラフ）タブ ---
 with tab4:
