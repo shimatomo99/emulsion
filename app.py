@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（全項目完全照会・編集対応版）"
+    "🧪 乳化安定性 予測AIアシスタント（ピーク面積比・破綻閾値解析対応版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>すべての入力・測定項目の詳細照会および完全編集に対応しています。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>第1/第2ピーク面積比をAI学習・評価し、安定性の限界閾値を自動分析します。</p>",
     unsafe_allow_html=True,
 )
 
@@ -634,9 +634,9 @@ with tab1:
       df.to_csv(DATA_FILE, index=False)
       st.success("測定データを正常に保存しました！")
 
-      # --- 提出と同時にAI予測を実行 ---
+      # --- 提出と同時にAI予測を実行（ピーク面積比を最重要特徴量に含む） ---
       st.divider()
-      st.header("🤖 同時AI予測・診断結果（40℃加速試験基準）")
+      st.header("🤖 同時AI予測・診断結果（ピーク面積比解析基準）")
 
       train_df = df[df["emulsifier"] == emulsifier]
       if len(train_df) < 2:
@@ -648,6 +648,7 @@ with tab1:
             "必要があります。"
         )
       else:
+        # 学習特徴量に peak_ratio_40 を含める
         base_feature_cols = [
             "oil_ratio",
             "water_amount",
@@ -691,11 +692,17 @@ with tab1:
                 "temperature",
                 "test_days",
                 "oil_ratio",
+                "peak_ratio_40",
             ]:
               active_feature_cols.append(col)
 
         if len(active_feature_cols) < 2:
-          active_feature_cols = ["temperature", "test_days", "oil_ratio"]
+          active_feature_cols = [
+              "temperature",
+              "test_days",
+              "oil_ratio",
+              "peak_ratio_40",
+          ]
 
         for col in active_feature_cols:
           if col not in train_df.columns:
@@ -707,7 +714,7 @@ with tab1:
           train_clean = train_df.dropna(subset=["is_stable"])
           active_feature_cols = [
               c
-              for c in ["temperature", "test_days", "oil_ratio"]
+              for c in ["temperature", "test_days", "oil_ratio", "peak_ratio_40"]
               if c in train_clean.columns
           ]
 
@@ -723,17 +730,27 @@ with tab1:
         proba = model.predict_proba(X_pred)[0]
         confidence = max(proba) * 100
 
+        # --- 過去の不安定データから「限界となるピーク面積比の閾値」を自動分析 ---
+        unstable_subset = train_clean[train_clean["is_stable"] == 0]
+        stable_subset = train_clean[train_clean["is_stable"] == 1]
+
+        avg_unstable_days = (
+            int(unstable_subset["days"].mean())
+            if len(unstable_subset) > 0 and "days" in unstable_subset
+            else 30
+        )
+
+        # 不安定になったサンプルでのピーク面積比の平均値（あるいは境界値）を算出
+        critical_ratio_threshold = (
+            float(unstable_subset["peak_ratio_40"].mean())
+            if len(unstable_subset) > 0 and "peak_ratio_40" in unstable_subset
+            else 5.0
+        )
+
         if prediction == 1:
           st.success(f"判定：**9か月間安定**（予測確信度: {confidence:.1f}%）")
           st.balloons()
         else:
-          unstable_subset = train_clean[train_clean["is_stable"] == 0]
-          avg_unstable_days = (
-              int(unstable_subset["days"].mean())
-              if len(unstable_subset) > 0 and "days" in unstable_subset
-              else 30
-          )
-
           st.error(
               f"🚨 【リスクアラート発令】 9か月以内に不安定化・分離の恐れあり"
               f"（予測確信度: {confidence:.1f}%）"
@@ -743,21 +760,37 @@ with tab1:
               f" **{avg_unstable_days} 日前後** で破綻する恐れがあります。"
           )
 
-          st.info("🤖 **AIからの改善ヒント・アドバイス**")
-          advice_list = []
-          if not none_oil and oil_ratio > 40.0:
-            advice_list.append(
-                "・**油分率が高めの処方です**：乳化剤の増量を推奨します。"
-            )
-          if peak_ratio_40 < 5.0:
-            advice_list.append("・**第1/第2ピーク面積比が低めです**。")
-          if not none_after_40 and not none_init and delta_d50_40 > 30:
-            advice_list.append("・**40℃粒径変動スピードが大きい**です。")
-          if not advice_list:
-            advice_list.append("・処方の再検討をおすすめします。")
+        # --- ピーク面積比に関するAIからの詳細アドバイス ---
+        st.info("🤖 **ピーク面積比に基づくAI分析・限界警告**")
+        st.write(
+            f"・蓄積された不安定データの分析から、第1/第2ピーク面積比が"
+            f" **{critical_ratio_threshold:.2f} 以下**"
+            "（第二ピークの割合が相対的に増大）になると、乳化安定性が崩れるリスクが高まる傾向があります。"
+        )
+        st.write(
+            f"・今回の入力されたピーク面積比: **{peak_ratio_40:.4f}**"
+            f" （健全な安定データの平均比率と比較してください）"
+        )
 
-          for advice in advice_list:
-            st.write(advice)
+        advice_list = []
+        if peak_ratio_40 < critical_ratio_threshold:
+          advice_list.append(
+              "・**第二ピークが大きくなりすぎています（面積比低下）**：合一・凝集が進んでいる恐れがあります。"
+          )
+        if not none_oil and oil_ratio > 40.0:
+          advice_list.append(
+              "・**油分率が高めの処方です**：乳化剤の増量をご検討ください。"
+          )
+        if not none_after_40 and not none_init and delta_d50_40 > 30:
+          advice_list.append("・**40℃粒径変動スピードが大きい**です。")
+
+        if not advice_list:
+          advice_list.append(
+              "・現在のピーク比は許容範囲内ですが、経時変化にご注意ください。"
+          )
+
+        for advice in advice_list:
+          st.write(advice)
     else:
       st.warning("顕微鏡写真を少なくとも1枚アップロードしてください。")
 
@@ -797,6 +830,9 @@ with tab2:
       "予測時の試験後平均粒径 (nm)", value=220.0, key="pred_after_d50"
   )
   pred_delta_d50 = pred_after_d50 - pred_init_d50
+  pred_peak_ratio = st.number_input(
+      "予測時の第1/第2ピーク面積比", value=10.0, step=0.0001, format="%.4f", key="pred_peak_ratio"
+  )
 
   pred_file = st.file_uploader(
       "📸 確認用コロイドの顕微鏡写真をアップロード",
@@ -821,6 +857,7 @@ with tab2:
             "delta_d50",
             "initial_d50",
             "after_d50",
+            "peak_ratio_40",
             "temperature",
         ]
         for col in feature_cols:
@@ -844,6 +881,7 @@ with tab2:
             pred_delta_d50,
             pred_init_d50,
             pred_after_d50,
+            pred_peak_ratio,
             40.0,
         ]])
 
@@ -1025,7 +1063,6 @@ with tab3:
                       else default
                   )
 
-                # --- 1. 詳細参照ポップアップ（全項目を網羅して表示） ---
                 with st.popover("📄 詳細データを参照"):
                   st.markdown(f"### 🔍 処方データ詳細: {pres_title}")
                   st.write(f"**登録ID**: {index}")
@@ -1088,7 +1125,6 @@ with tab3:
                   st.write(f"- メモ: {get_val('condition')}")
 
                 st.write("")
-                # --- 2. 編集ポップアップ（全項目をフォームから編集・保存可能） ---
                 with st.popover("🖥️ 編集"):
                   st.markdown(
                       f"### ✏️ データの全項目編集 (ID: {index} / 処方:"
