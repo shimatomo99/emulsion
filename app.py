@@ -69,10 +69,10 @@ st.markdown(
 )
 
 st.title(
-    "🧪 乳化安定性 予測AIアシスタント（入力レイアウト最適化版）"
+    "🧪 乳化安定性 予測AIアシスタント（編集タブ対応・完全版）"
 )
 st.markdown(
-    "<p style='color: #475569; font-size: 1.1em;'>各温度タブ内の「濁度」をピーク上に配置し、顕微鏡写真を一番下に整理しました。</p>",
+    "<p style='color: #475569; font-size: 1.1em;'>データ提出時と同様に、編集画面でも5℃・40℃のタブで全パラメータを管理できます。</p>",
     unsafe_allow_html=True,
 )
 
@@ -323,7 +323,6 @@ with tab1:
         else 0.0
     )
 
-    # 濁度をピークの上に配置
     st.markdown("#### 💧 5℃ 試験後濁度")
     none_turb_5 = st.checkbox("5℃試験後濁度：データなし", key="chk_turb_5")
     if none_turb_5:
@@ -391,7 +390,6 @@ with tab1:
             key="p2_rat_5",
         )
 
-    # 顕微鏡写真はそのまま一番下
     st.markdown("#### 📸 5℃条件の顕微鏡写真")
     file_5 = st.file_uploader(
         "顕微鏡写真ファイルをアップロード",
@@ -435,7 +433,6 @@ with tab1:
         else 0.0
     )
 
-    # 濁度をピークの上に配置
     st.markdown("#### 💧 40℃ 試験後濁度")
     none_turb_40 = st.checkbox("40℃試験後濁度：データなし", key="chk_turb_40")
     if none_turb_40:
@@ -503,7 +500,6 @@ with tab1:
             key="p2_rat_40",
         )
 
-    # 顕微鏡写真はそのまま一番下
     st.markdown("#### 📸 40℃条件の顕微鏡写真")
     file_40 = st.file_uploader(
         "顕微鏡写真ファイルをアップロード",
@@ -1046,52 +1042,170 @@ with tab3:
                       key=f"e_emul_{index}",
                   )
 
-                  edit_water = st.number_input(
-                      "水層の量 (g)",
-                      value=float(row.get("water_amount", 80.0)),
-                      key=f"e_water_{index}",
+                  st.markdown("#### 💧 処方組成の編集")
+                  col_ew1, col_ew2 = st.columns(2)
+                  with col_ew1:
+                    edit_water = st.number_input(
+                        "水層の量 (g)",
+                        value=float(row.get("water_amount", 80.0)),
+                        key=f"e_water_{index}",
+                    )
+                  with col_ew2:
+                    edit_oil = st.number_input(
+                        "油層の量 (g)",
+                        value=float(row.get("oil_amount", 20.0)),
+                        key=f"e_oil_{index}",
+                    )
+
+                  st.markdown("#### 🔬 共通初期値の編集（虐待前）")
+                  col_ei1, col_ei2 = st.columns(2)
+                  with col_ei1:
+                    edit_init = st.number_input(
+                        "初期平均粒径 (nm)",
+                        value=float(row.get("initial_d50", 200.0)),
+                        key=f"e_init_{index}",
+                    )
+                  with col_ei2:
+                    edit_turb_init = st.number_input(
+                        "虐待前（初期）濁度",
+                        value=float(
+                            row.get("initial_turbidity", 1.0)
+                            if pd.notnull(row.get("initial_turbidity"))
+                            else 1.0
+                        ),
+                        format="%.4f",
+                        key=f"e_turbinit_{index}",
+                    )
+
+                  st.markdown(
+                      "#### 🌡️ 温度別（5℃ /"
+                      " 40℃）の試験後データ編集タブ"
                   )
-                  edit_oil = st.number_input(
-                      "油層の量 (g)",
-                      value=float(row.get("oil_amount", 20.0)),
-                      key=f"e_oil_{index}",
+                  edit_tab_5, edit_tab_40 = st.tabs(
+                      ["❄️ 5℃ 試験データ", "🔥 40℃ 試験データ"]
                   )
 
-                  st.markdown("#### 🔬 共通初期値の編集")
-                  edit_init = st.number_input(
-                      "初期平均粒径 (nm)",
-                      value=float(row.get("initial_d50", 200.0)),
-                      key=f"e_init_{index}",
-                  )
-                  edit_turb_init = st.number_input(
-                      "虐待前（初期）濁度",
-                      value=float(
-                          row.get("initial_turbidity", 1.0)
-                          if pd.notnull(row.get("initial_turbidity"))
-                          else 1.0
-                      ),
-                      format="%.4f",
-                      key=f"e_turbinit_{index}",
-                  )
+                  with edit_tab_5:
+                    edit_test_days_5 = st.number_input(
+                        "5℃試験 期間 (日)",
+                        value=int(
+                            row.get("test_days", 14)
+                            if pd.notnull(row.get("test_days"))
+                            else 14
+                        ),
+                        key=f"e_days_5_{index}",
+                    )
+                    edit_after_5 = st.number_input(
+                        "5℃試験後平均粒径 (nm)",
+                        value=float(
+                            row.get("after_d50_5", 205.0)
+                            if pd.notnull(row.get("after_d50_5"))
+                            else 205.0
+                        ),
+                        key=f"e_after5_{index}",
+                    )
+                    edit_turb_5 = st.number_input(
+                        "5℃ 試験後濁度",
+                        value=float(
+                            row.get("turbidity_5", 1.0)
+                            if pd.notnull(row.get("turbidity_5"))
+                            else 1.0
+                        ),
+                        format="%.4f",
+                        key=f"e_turb5_{index}",
+                    )
+                    edit_p1_min_5 = st.number_input(
+                        "5℃ 第1ピーク 最小値",
+                        value=float(row.get("peak1_min", 50.0)),
+                        key=f"e_p1min5_{index}",
+                    )
+                    edit_p1_max_5 = st.number_input(
+                        "5℃ 第1ピーク 最大値",
+                        value=float(row.get("peak1_max", 500.0)),
+                        key=f"e_p1max5_{index}",
+                    )
+                    edit_p1_ratio_5 = st.number_input(
+                        "5℃ 第1ピーク比率 (%)",
+                        value=float(
+                            row.get("peak1_ratio_5", row.get("peak1_ratio", 95.0))
+                        ),
+                        key=f"e_p1rat5_{index}",
+                    )
+                    edit_p2_min_5 = st.number_input(
+                        "5℃ 第2ピーク 最小値",
+                        value=float(row.get("peak2_min", 500.0)),
+                        key=f"e_p2min5_{index}",
+                    )
+                    edit_p2_max_5 = st.number_input(
+                        "5℃ 第2ピーク 最大値",
+                        value=float(row.get("peak2_max", 5000.0)),
+                        key=f"e_p2max5_{index}",
+                    )
+                    edit_p2_ratio_5 = st.number_input(
+                        "5℃ 第2ピーク比率 (%)",
+                        value=float(
+                            row.get("peak2_ratio_5", row.get("peak2_ratio", 5.0))
+                        ),
+                        key=f"e_p2rat5_{index}",
+                    )
 
-                  st.markdown("#### 🔥 40℃ 試験後編集")
-                  edit_after = st.number_input(
-                      "40℃試験後平均粒径 (nm)",
-                      value=float(row.get("after_d50", 220.0)),
-                      key=f"e_after_{index}",
-                  )
+                  with edit_tab_40:
+                    edit_test_days_40 = st.number_input(
+                        "40℃試験 期間 (日)",
+                        value=int(
+                            row.get("test_days", 14)
+                            if pd.notnull(row.get("test_days"))
+                            else 14
+                        ),
+                        key=f"e_days_40_{index}",
+                    )
+                    edit_after = st.number_input(
+                        "40℃試験後平均粒径 (nm)",
+                        value=float(row.get("after_d50", 220.0)),
+                        key=f"e_after_{index}",
+                    )
+                    edit_turb_40 = st.number_input(
+                        "40℃ 試験後濁度",
+                        value=float(
+                            row.get("turbidity", 1.0)
+                            if pd.notnull(row.get("turbidity"))
+                            else 1.0
+                        ),
+                        format="%.4f",
+                        key=f"e_turb40_{index}",
+                    )
+                    edit_p1_min_40 = st.number_input(
+                        "40℃ 第1ピーク 最小値",
+                        value=float(row.get("peak1_min", 50.0)),
+                        key=f"e_p1min40_{index}",
+                    )
+                    edit_p1_max_40 = st.number_input(
+                        "40℃ 第1ピーク 最大値",
+                        value=float(row.get("peak1_max", 500.0)),
+                        key=f"e_p1max40_{index}",
+                    )
+                    edit_p1_ratio_40 = st.number_input(
+                        "40℃ 第1ピーク比率 (%)",
+                        value=float(row.get("peak1_ratio", 95.0)),
+                        key=f"e_p1rat40_{index}",
+                    )
+                    edit_p2_min_40 = st.number_input(
+                        "40℃ 第2ピーク 最小値",
+                        value=float(row.get("peak2_min", 500.0)),
+                        key=f"e_p2min40_{index}",
+                    )
+                    edit_p2_max_40 = st.number_input(
+                        "40℃ 第2ピーク 最大値",
+                        value=float(row.get("peak2_max", 5000.0)),
+                        key=f"e_p2max40_{index}",
+                    )
+                    edit_p2_ratio_40 = st.number_input(
+                        "40℃ 第2ピーク比率 (%)",
+                        value=float(row.get("peak2_ratio", 5.0)),
+                        key=f"e_p2rat40_{index}",
+                    )
 
-                  st.markdown("#### ❄️ 5℃ 試験後編集")
-                  edit_after_5 = st.number_input(
-                      "5℃試験後平均粒径 (nm)",
-                      value=float(
-                          row.get("after_d50_5", 205.0)
-                          if pd.notnull(row.get("after_d50_5"))
-                          else 205.0
-                      ),
-                      key=f"e_after5_{index}",
-                  )
-
+                  st.markdown("---")
                   edit_cond = st.text_input(
                       "その他メモ",
                       value=(
@@ -1121,7 +1235,8 @@ with tab3:
 
                     tot = edit_water + edit_oil
                     new_o_rat = (edit_oil / tot * 100.0) if tot > 0 else 0.0
-                    new_delta = edit_after - edit_init
+                    new_delta_40 = edit_after - edit_init
+                    new_delta_5 = edit_after_5 - edit_init
                     new_is_stable = (
                         1 if edit_stability.startswith("安定") else 0
                     )
@@ -1133,9 +1248,26 @@ with tab3:
                     df.loc[index, "oil_ratio"] = float(new_o_rat)
                     df.loc[index, "initial_d50"] = float(edit_init)
                     df.loc[index, "initial_turbidity"] = float(edit_turb_init)
+
+                    # 40℃データの反映
+                    df.loc[index, "test_days"] = int(edit_test_days_40)
                     df.loc[index, "after_d50"] = float(edit_after)
-                    df.loc[index, "delta_d50"] = float(new_delta)
+                    df.loc[index, "delta_d50"] = float(new_delta_40)
+                    df.loc[index, "turbidity"] = float(edit_turb_40)
+                    df.loc[index, "peak1_min"] = float(edit_p1_min_40)
+                    df.loc[index, "peak1_max"] = float(edit_p1_max_40)
+                    df.loc[index, "peak1_ratio"] = float(edit_p1_ratio_40)
+                    df.loc[index, "peak2_min"] = float(edit_p2_min_40)
+                    df.loc[index, "peak2_max"] = float(edit_p2_max_40)
+                    df.loc[index, "peak2_ratio"] = float(edit_p2_ratio_40)
+
+                    # 5℃データの反映
                     df.loc[index, "after_d50_5"] = float(edit_after_5)
+                    df.loc[index, "delta_d50_5"] = float(new_delta_5)
+                    df.loc[index, "turbidity_5"] = float(edit_turb_5)
+                    df.loc[index, "peak1_ratio_5"] = float(edit_p1_ratio_5)
+                    df.loc[index, "peak2_ratio_5"] = float(edit_p2_ratio_5)
+
                     df.loc[index, "condition"] = str(edit_cond)
                     df.loc[index, "stability_text"] = edit_stability
                     df.loc[index, "is_stable"] = int(new_is_stable)
