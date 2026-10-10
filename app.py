@@ -12,6 +12,25 @@ DATA_FILE = "dataset.csv"
 
 st.title("🧪 乳化安定性 予測AIアプリ")
 
+# --- パスワード認証機能 ---
+if "authenticated" not in st.session_state:
+  st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+  st.warning("🔒 このアプリを利用するにはパスワードが必要です。")
+  input_pass = st.text_input("パスワードを入力してください", type="password")
+
+  if st.button("ログイン"):
+    if input_pass == "Shimatomo7":
+      st.session_state.authenticated = True
+      st.success("ログインに成功しました！")
+      st.rerun()
+    else:
+      st.error("パスワードが違います。")
+  st.stop()
+
+# --- 認証成功後のメインアプリ ---
+
 # タブの切り替え
 tab1, tab2, tab3, tab4 = st.tabs([
     "📁 データ提出モード",
@@ -110,8 +129,9 @@ with tab1:
         key="sub_unstable_days",
     )
 
+  # スマホからアクセスした場合はカメラ撮影も直接選択可能
   uploaded_file = st.file_uploader(
-      "コロイドの顕微鏡写真をアップロード (ドラッグ＆ドロップ可)",
+      "📸 コロイドの顕微鏡写真をアップロード（スマホからはその場でカメラ撮影も可）",
       type=["png", "jpg", "jpeg"],
       key="sub_file",
   )
@@ -161,19 +181,18 @@ with tab1:
       else:
         df = new_data
 
-      # 保存前に文字列列の型を文字列に強制変換してエラーを防ぐ
       df["prescription_no"] = df["prescription_no"].astype(str)
       df["condition"] = df["condition"].astype(str)
       df.to_csv(DATA_FILE, index=False)
       st.success("データを正常に保存しました！")
     else:
-      st.warning("写真をアップロードしてください。")
+      st.warning("写真をアップロードまたは撮影してください。")
 
-# --- 2. 予測・確認タブ ---
+# --- 2. 予測・確認タブ（アラート通知機能付き） ---
 with tab2:
-  st.header("AIによる安定性予測・理由付け")
+  st.header("AIによる安定性予測・リスクアラート")
   st.info(
-      "画像特徴量に加え、温度・期間・粒径・濁度などの実験条件を総合的に考慮してAIが予測します。"
+      "現場で撮影・準備した顕微鏡写真と条件から、AIが分離リスクを詳細に診断します。"
   )
 
   pred_emulsifier = st.selectbox(
@@ -204,7 +223,7 @@ with tab2:
     )
 
   pred_file = st.file_uploader(
-      "確認用コロイドの顕微鏡写真をアップロード",
+      "📸 確認用コロイドの顕微鏡写真をアップロード（またはスマホカメラで撮影）",
       type=["png", "jpg", "jpeg"],
       key="pred_file",
   )
@@ -218,7 +237,7 @@ with tab2:
         train_df = df[df["emulsifier"] == pred_emulsifier]
 
         if len(train_df) < 2:
-          train_df = df  # データが少なければ全体を使う
+          train_df = df
 
         if len(train_df) < 2:
           st.error(
@@ -263,14 +282,30 @@ with tab2:
             confidence = max(proba) * 100
 
             st.subheader("📊 AIの判定結果")
+
+            # 🔔 リスクアラート機能の組み込み
             if prediction == 1:
               st.success(
                   f"判定：**9か月間安定**（予測確信度: {confidence:.1f}%）"
               )
+              st.balloons()
             else:
+              # 過去の不安定データから平均何日目で不安定になったかを計算して警告に添える
+              unstable_subset = train_clean[train_clean["is_stable"] == 0]
+              avg_unstable_days = (
+                  int(unstable_subset["days"].mean())
+                  if len(unstable_subset) > 0 and "days" in unstable_subset
+                  else 30
+              )
+
+              st.error(
+                  f"🚨 【リスクアラート発令】 9か月以内に不安定化・分離の恐れあり"
+                  f"（予測確信度: {confidence:.1f}%）"
+              )
               st.warning(
-                  f"判定：**9か月以内に不安定化の恐れあり**（予測確信度:"
-                  f" {confidence:.1f}%）"
+                  f"⚠️ **注意喚起**: 過去の同条件・類似傾向のデータでは、平均して"
+                  f" **約 {avg_unstable_days} 日前後** で分離・クリーミングの"
+                  f"兆候が見られます。温度条件や粒径の再調整を推奨します。"
               )
 
             st.subheader("💡 判定の理由と分析")
@@ -300,7 +335,7 @@ with tab2:
                   "す。"
               )
     else:
-      st.warning("確認用の写真をアップロードしてください。")
+      st.warning("確認用の写真をアップロードまたは撮影してください。")
 
 # --- 3. データ履歴・見返しタブ（編集機能付き） ---
 with tab3:
@@ -451,7 +486,6 @@ with tab3:
               )
 
               if st.button("💾 変更を保存", key=f"save_edit_{index}"):
-                # データを更新する前に、確実に各列を正しい型に合わせる
                 df["prescription_no"] = df["prescription_no"].astype(str)
                 df["condition"] = df["condition"].astype(str)
 
